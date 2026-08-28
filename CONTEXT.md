@@ -98,7 +98,8 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 
 | Term | Meaning | Avoid |
 |---|---|---|
-| **Desk** | The whole system. Sells and buys. | Platform, service, backend |
+| **StitchAI** | The product name. Use it in the README, the video and anything outward-facing. | Stitch, the app |
+| **Desk** | The whole system — what StitchAI *is*. Sells and buys. Use this internally, in code and in logs. | Platform, service, backend |
 | **Buyer agent** | External counterparty trying to purchase. Untrusted. | Customer, client, shopper |
 | **Supplier agent** | External counterparty selling to us. Environment, not product. | Vendor, seller |
 | **Mandate** | A signed authorisation from a human principal. | Permission, token, approval |
