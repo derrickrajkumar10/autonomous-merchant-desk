@@ -60,11 +60,16 @@ Key separation to keep clear everywhere in the code:
 - **FR-1.1** Capture human intent by voice, transcribe to structured constraints:
   category / SKU, maximum spend, quantity, delivery constraints, expiry (TTL).
 - **FR-1.2** Generate a natural-language "prompt playback" — the agent's
-  restatement of what the human asked — and include it in the mandate.
-- **FR-1.3** Sign the mandate with the **principal's** key (held in the human's
-  wallet/app, never by the buyer agent). Structure follows AP2's Intent Mandate.
-- **FR-1.4** The mandate names the agent permitted to present it. A stolen
-  mandate must not work for a different agent.
+  restatement of what the human asked — and include it in the mandate. **This is
+  ours, not AP2's**: v0.2 has no natural-language restatement field, so we carry it
+  as our own claim and say so in FR-11.3.
+- **FR-1.3** Sign the mandate with the **principal's** key (held in the wallet,
+  never by the buyer agent). Structure follows AP2 v0.2's **open Checkout Mandate**
+  (`mandate.checkout.open.1`). There is no Intent Mandate in v0.2 — see CONTEXT.md §4.
+- **FR-1.4** The mandate binds the agent permitted to present it, by carrying that
+  agent's **public key in a `cnf` claim** (RFC 7800), which AP2 makes a MUST on open
+  mandates. A stolen mandate is therefore unusable without the agent's private key,
+  not merely mismatched on an identifier. **We implement this; we did not invent it.**
 - **FR-1.5** Voice is used **only** at the human edge. Agent-to-agent
   communication is a structured protocol, never voice.
 
@@ -87,7 +92,7 @@ trail.
 | # | Check | Type | Refusal reason example |
 |---|---|---|---|
 | 1 | **Identity** — signature verifies against a registered public key | Deterministic | `agent_signature_invalid` |
-| 2 | **Mandate validity** — principal's signature verifies, mandate not expired, presenting agent matches the named agent | Deterministic | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
+| 2 | **Mandate validity** — principal's signature verifies, mandate not expired, presenting agent's key matches the mandate's `cnf` claim | Deterministic | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
 | 3 | **Spend authority** — amount within remaining balance, category matches, still inside validity window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised` |
 | 4 | **Replay & freshness** — nonce unseen, timestamp inside window | Deterministic | `nonce_replayed`, `request_stale` |
 | 5 | **Content & behaviour inspection** — is this text information or an instruction aimed at the Desk? Does this agent's behaviour pattern look like probing, salami-slicing, or trust farming? | **Judgment (LLM + learned model)** | `prompt_injection_detected`, `escalation_pattern_detected` |
@@ -97,8 +102,11 @@ trail.
 - **FR-3.2** Check 5 has two parts: an LLM reasoning pass over message content,
   and a learned behavioural model over the agent's request history (sequence,
   timing, amount escalation).
-- **FR-3.3** Partial spend is tracked per mandate. Remaining balance decrements
-  on each honoured deal. This, with FR-3.4, closes the replay hole.
+- **FR-3.3** Partial spend is tracked per mandate against the mandate's
+  **`payment.budget`** constraint: the requested amount plus the sum of amounts from
+  previously closed Payment Mandates must be at or under `max`, and the amount is added
+  to the accumulated total after approval. The mandate stays immutable; the accumulator
+  is Desk-side state (ADR-0004). This, with FR-3.4, closes the replay hole.
 - **FR-3.4** Seen nonces are persisted and checked. Requests older than a short
   configurable window are refused.
 
@@ -131,8 +139,10 @@ trail.
   This is surfaced in the UI next to the message.
 - **FR-5.5** The Desk must be able to **walk away** from a deal below its floor,
   and this outcome is recorded as a success, not an error.
-- **FR-5.6** On agreement, produce a Cart/Checkout Mandate capturing the exact
-  negotiated terms.
+- **FR-5.6** On agreement, produce a **closed Checkout Mandate**
+  (`mandate.checkout.1`) capturing the exact negotiated terms. The Checkout JWT is
+  signed **ES256, not Ed25519** — AP2 requires a non-deterministic scheme here
+  (ADR-0002, known exception).
 
 ### 5.6 Learning the negotiation policy
 
@@ -222,7 +232,10 @@ Makes treasury's "cleared cash" provable rather than asserted. See CONTEXT.md
 - **FR-11.1** Publish the protocol spec so an external buyer agent — including
   one a judge writes — can register and transact.
 - **FR-11.2** Ship a minimal reference client.
-- **FR-11.3** Document precisely where we follow AP2 and where we extended it.
+- **FR-11.3** Document precisely where we follow AP2 and where we go beyond it.
+  We **implement** `cnf` key binding and the `payment.budget` constraint rather than
+  extending them. What is genuinely ours: the agent registry, the reputation ladder,
+  the scrutiny tiers, and "prompt playback".
 - **FR-11.4** **Docker Compose** brings up the whole system — desk, supplier
   agents, swarm runner, front-end — with a single command. This is what makes
   FR-11.1 real rather than a claim: "clone and `docker compose up`" is the
@@ -327,9 +340,10 @@ From the 1,000-deal batch run:
 Ordered so that nothing later is blocked and the video is protected.
 
 1. **Event schema + audit trail.** Everything reads from this. Do it first.
-2. **Keys, JWS/Ed25519 signing, agent registration.**
-3. **Mandate model** (AP2 Intent / Cart / Payment), including partial-spend
-   balance and nonce store.
+2. **Keys, JWS signing, agent registration.** Ed25519 for agent requests and Desk
+   receipts; ES256 for the Checkout JWT (ADR-0002).
+3. **Mandate model** — AP2 v0.2 open/closed **Checkout** and **Payment** Mandates,
+   `cnf` key binding, the `payment.budget` accumulator and the nonce store.
 4. **Checks 1–4**, deterministic, with named refusal reasons.
 5. **Storefront catalogue + costs + margin floors.**
 6. **Negotiation engine** with levers and walk-away.

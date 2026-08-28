@@ -49,25 +49,47 @@ decision should protect it.
 |---|---|---|
 | Agent transport | A2A | Use it; not our contribution |
 | Payment mandates | **AP2** (Google, Apache 2.0) | **Adopt its mandate model** |
-| Agent identity attestation | Visa TAP | AP2 deliberately leaves this out — **we fill it** |
+| Agent identity attestation | Visa TAP | AP2 binds the *agent* via a `cnf` claim — we implement it. What AP2 leaves out is **registry and reputation**, and that is what we fill |
 | Payment rails | Razorpay test-mode APIs | Use as-is |
 
 AP2 gives us the *envelope*: how a human's authorisation is expressed, signed and
-chained. It does **not** give us a merchant that decides. AP2 also binds mandates
-to the **user, not the agent** — agent identity is explicitly out of scope for
-AP2. That gap is where our agent-identity registry and reputation ladder live.
+chained. It does **not** give us a merchant that decides.
+
+**Corrected 2026-08-28 against AP2 v0.2** — see
+[docs/research/ap2-mandate-model.md](docs/research/ap2-mandate-model.md). An earlier version of
+this file claimed AP2 binds mandates to the user and not the agent. That is false: open mandates
+MUST carry the agent's public key in a `cnf` claim (RFC 7800), so a stolen mandate is unusable
+without the agent's private key. We *implement* that binding rather than inventing it.
+
+What AP2 genuinely leaves out is everything downstream of identity — is this agent registered,
+what is its reputation, what ceiling does it get, how does scrutiny change. That is where our
+agent registry and reputation ladder live, and it is a narrower but true claim.
 
 Standing on a standard is a strength, not a shortcut. Say so on camera.
 
 ### AP2 concepts we reuse
-- **Intent Mandate** — the human's constraints: category, max price, TTL, plus
-  "prompt playback" (the agent's natural-language restatement of what the human
-  asked). Fits our voice capture exactly.
-- **Cart / Checkout Mandate** — the specific negotiated deal.
-- **Payment Mandate** — authorisation of the actual charge.
-- Mandates are signed verifiable credentials carrying a timestamp, nonce and
-  signer key reference — so replay and freshness checks come nearly free.
-- AP2 supports an "open" / human-not-present mode, which is our delegated case.
+
+We target **AP2 v0.2** (released 2026-04-28). v0.2 defines **two** mandate types, each with an
+**open** and a **closed** variant — there is no Intent Mandate and no Cart Mandate. Those are
+v0.1, whose models still sit in the AP2 repo and are easy to mistake for current.
+
+- **Checkout Mandate** (`mandate.checkout.open.1` / `mandate.checkout.1`) — the open variant
+  carries the human's forward-looking constraints; the closed variant is the specific negotiated
+  deal. The open variant fills the role we had been calling an Intent Mandate.
+- **Payment Mandate** (`mandate.payment.open.1` / `mandate.payment.1`) — authorisation of the
+  actual charge.
+- **`cnf` key binding** — open mandates MUST carry the presenting agent's public key. This is
+  what makes a stolen mandate useless to a different agent.
+- **`payment.budget` constraint** — a spend ceiling drawn down across presentations, with a
+  normative evaluation rule. The mandate stays immutable; the accumulator is verifier-side state.
+- Mandates are **SD-JWT** signed credentials carrying timestamp, expiry, nonce and signer key
+  reference, so replay and freshness checks come nearly free. Note `iat`/`exp` sit on the mandate
+  while `nonce`/`aud` sit on the key-binding hop — check 4 therefore reads two layers.
+- The **open / human-not-present mode** is the spec's own word for our delegated case.
+
+**Not from AP2:** "prompt playback" is ours. v0.2 has no natural-language restatement field, so we
+carry it ourselves and should stop describing it as an AP2 concept. Our wallet does map onto AP2's
+**Trusted Surface**, a role v0.2 defines while deliberately leaving open what it displays.
 
 ## 5. Design principles (these settle arguments)
 
@@ -103,6 +125,9 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 | **Buyer agent** | External counterparty trying to purchase. Untrusted. | Customer, client, shopper |
 | **Supplier agent** | External counterparty selling to us. Environment, not product. | Vendor, seller |
 | **Mandate** | A signed authorisation from a human principal. | Permission, token, approval |
+| **Open mandate** | The forward-looking variant, carrying constraints and the presenting agent's key. Fills the role we used to call an Intent Mandate. | Intent Mandate, Cart Mandate |
+| **Closed mandate** | The variant capturing one specific agreed transaction. | Cart Mandate |
+| **Key binding** | The `cnf` claim carrying the presenting agent's public key, which makes a stolen mandate useless to anyone else. | Agent name, agent ID |
 | **Principal** | The human whose key signs a mandate. | User, owner, account |
 | **Agent identity** | The agent's own registered keypair — proves *who is asking*, not *what is authorised*. | Auth, credentials |
 | **Trust score** | Per-agent reputation that gates spend ceiling and scrutiny tier. | Rating, karma |
