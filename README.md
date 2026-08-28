@@ -20,6 +20,7 @@
 <img src="https://img.shields.io/badge/every_refusal-names_its_reason-2ea44f?style=flat-square" alt="Every refusal names its reason">
 <img src="https://img.shields.io/badge/red_team-adversarial_LLM-c0392b?style=flat-square" alt="Adversarial red team">
 <img src="https://img.shields.io/badge/metrics-held--out_%26_honest-8e44ad?style=flat-square" alt="Honest metrics">
+<img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT licence">
 </p>
 
 </div>
@@ -200,3 +201,9 @@ Held-out attack classes are withheld during development and run only at the end,
 The control room is built on **[pixel-agents](https://github.com/pixel-agents-hq/pixel-agents)** by Pablo De Lucca and contributors (MIT), which supplies the office renderer, character animation, and layout system. Characters are from the **[Metro City pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)** by JIK-A-4.
 
 A project whose entire thesis is provenance does not quietly strip an attribution.
+
+---
+
+## Licence
+
+StitchAI is released under the [MIT Licence](LICENSE).
