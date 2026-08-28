@@ -52,7 +52,8 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
     """A pool over a database holding nothing but a freshly installed trail."""
     with ConnectionPool(database_url, min_size=1, max_size=8, open=True) as pool:
         with pool.connection() as conn:
-            conn.execute("DROP TABLE IF EXISTS audit_entry")
+            # CASCADE, because the per-consumer views sit on the table.
+            conn.execute("DROP TABLE IF EXISTS audit_entry CASCADE")
             conn.execute("DROP TYPE IF EXISTS audit_event_type")
             conn.execute("DROP TYPE IF EXISTS audit_reason_code")
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_append_only")

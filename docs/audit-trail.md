@@ -41,9 +41,40 @@ convention every write site follows:
 }
 ```
 
-Anything else a subsystem needs sits alongside those keys. A payload that will not
-survive a round trip through `jsonb` unchanged is refused at write time, because an
-entry that fails to verify later is worse than a write that fails now.
+Anything else a subsystem needs sits alongside those keys. A payload that is not
+JSON-serialisable is refused at write time, because an entry that fails to verify
+later is worse than a write that fails now.
+
+The four keys are a convention rather than a constraint, deliberately. Not every
+event has reasoning to give — `request_received` does not — and forcing empty keys
+onto those entries would buy a schema check at the cost of making the empty ones
+look deliberate. The ticket that owns a decision owns proving its entry carries the
+reasoning behind it.
+
+### Payload fidelity
+
+The hash is taken over the payload **as Postgres holds it**, not as Python wrote it.
+`jsonb` normalises some numbers — the float `1e+16` is stored as
+`10000000000000000` — so hashing the Python form would write entries that verify at
+the moment of writing and then fail verification for ever after. That is the worst
+failure this component has: silent, delayed, and it discredits the one thing the
+trail exists to prove. `record()` therefore round-trips the payload through the
+database before hashing, which removes the whole class of divergence rather than
+enumerating it.
+
+### Corrections
+
+Nothing is edited, so a correction is a new entry naming the entry it corrects:
+
+```json
+{
+  "corrects_seq": 41,
+  "reasoning": "the enquiry was quoting a customer, not instructing the Desk"
+}
+```
+
+The correcting entry carries the same `subject_id` as the entry it corrects, so a
+detail panel showing that subject shows both, in the order they happened.
 
 ---
 
@@ -131,8 +162,26 @@ trail.query(after_seq=last_drawn)                               # for the contro
 ```
 
 `since` is inclusive and `until` exclusive, so adjacent windows tile without
-double-counting. `after_seq` is exclusive, which is how the control room tails the
-trail without re-reading what it has already drawn.
+double-counting. `after_seq` is exclusive, so a caller that has already read up to a
+point can ask for what came after it.
+
+### Views
+
+Consumers read a named view rather than the raw table, so the table underneath can
+change shape without every consumer changing with it (ADR-0006).
+
+| View | Holds |
+|:---|:---|
+| `audit_control_room` | Every entry, without the chain hashes. |
+| `audit_refusals` | Entries carrying a `reason_code` — what a breakdown of refusals by check reads. |
+
+Neither exposes `prev_hash` or `hash`: those are how the trail proves itself, not
+something a consumer draws.
+
+ADR-0006 also names per-agent detail panels as a consumer. They read
+`audit_control_room` filtered by `subject_id`, and a view that hard-codes nothing but
+a `WHERE` clause the caller must supply anyway would earn its keep from nobody — so
+there isn't one.
 
 ---
 

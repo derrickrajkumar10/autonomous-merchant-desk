@@ -19,11 +19,11 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from psycopg import sql
+from psycopg import Connection, Cursor, sql
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from desk.audit.entry import GENESIS_HASH, AuditEntry, canonical_payload
+from desk.audit.entry import GENESIS_HASH, AuditEntry, json_payload
 from desk.audit.schema import TABLE
 from desk.audit.vocabulary import (
     EventType,
@@ -83,33 +83,38 @@ class AuditTrail:
         """Write one entry and return it as written.
 
         ``payload`` carries the reasoning, the evidence and the resulting state change
-        (FR-10.1). Everything is validated before a connection is taken, so a rejected
-        write leaves no trace and no gap in the sequence.
+        (FR-10.1). Everything that can be validated without a connection is validated
+        first, so a rejected write leaves no trace and no gap in the sequence.
+
+        The hash is taken over the payload as **Postgres** will hold it, not as Python
+        wrote it. ``jsonb`` normalises some numbers (``1e+16`` is stored as
+        ``10000000000000000``), so hashing the Python form would produce entries that
+        write cleanly and then silently fail verification later — a trail accusing
+        itself of tampering when nothing had tampered. Round-tripping the payload
+        through the database before hashing removes that whole class of divergence.
         """
         event = coerce_event_type(event_type)
         reason = None if reason_code is None else coerce_reason_code(reason_code)
         actor = _required(actor, "actor")
         subject_id = _required(subject_id, "subject_id")
-        body = canonical_payload(payload)
+        body = json_payload(payload)
 
         with self._pool.connection() as conn:
             conn.execute("SELECT pg_advisory_xact_lock(%s)", (_CHAIN_LOCK_KEY,))
-            head = conn.execute(
-                f"SELECT seq, hash FROM {TABLE} ORDER BY seq DESC LIMIT 1"
-            ).fetchone()
-            prev_seq, prev_hash = head if head is not None else (0, GENESIS_HASH)
-            clock = conn.execute("SELECT clock_timestamp()").fetchone()
-            assert clock is not None
+            head = self._head(conn)
+            stored_payload, ts = _one(
+                conn.execute("SELECT %s::jsonb, clock_timestamp()", (Jsonb(body),))
+            )
 
             draft = AuditEntry(
-                seq=prev_seq + 1,
-                ts=clock[0],
+                seq=1 if head is None else head.seq + 1,
+                ts=ts,
                 actor=actor,
                 event_type=event,
                 subject_id=subject_id,
                 reason_code=reason,
-                payload=body,
-                prev_hash=prev_hash,
+                payload=stored_payload,
+                prev_hash=GENESIS_HASH if head is None else head.hash,
                 hash="",
             )
             entry = dataclasses.replace(draft, hash=draft.recompute_hash())
@@ -187,9 +192,11 @@ class AuditTrail:
     def head(self) -> AuditEntry | None:
         """The last entry written, or ``None`` on an empty trail."""
         with self._pool.connection() as conn:
-            row = conn.execute(
-                f"SELECT {_COLUMNS} FROM {TABLE} ORDER BY seq DESC LIMIT 1"
-            ).fetchone()
+            return self._head(conn)
+
+    @staticmethod
+    def _head(conn: Connection[Any]) -> AuditEntry | None:
+        row = conn.execute(f"SELECT {_COLUMNS} FROM {TABLE} ORDER BY seq DESC LIMIT 1").fetchone()
         return None if row is None else _to_entry(row)
 
     def verify(self, *, expected_head_hash: str | None = None) -> ChainVerification:
@@ -252,6 +259,14 @@ class AuditTrail:
                 ),
             )
         return ChainVerification(ok=True, entries_checked=checked)
+
+
+def _one(cursor: Cursor[Any]) -> tuple[Any, ...]:
+    """The single row a scalar SELECT returns."""
+    row: tuple[Any, ...] | None = cursor.fetchone()
+    if row is None:  # pragma: no cover - a scalar SELECT always returns one row
+        raise RuntimeError("the database returned no row for a scalar select")
+    return row
 
 
 def _required(value: str, field: str) -> str:

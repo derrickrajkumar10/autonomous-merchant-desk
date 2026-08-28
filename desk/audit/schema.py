@@ -38,6 +38,8 @@ def install_schema(conn: Connection[Any]) -> None:
         conn.execute(statement)
     for statement in _INDEX_DDL:
         conn.execute(statement)
+    for statement in _VIEW_DDL:
+        conn.execute(statement)
 
 
 def _install_enum(conn: Connection[Any], type_name: str, values: Sequence[str]) -> None:
@@ -139,6 +141,25 @@ CREATE TRIGGER {TABLE}_no_truncate
 CREATE TRIGGER {TABLE}_chain
     BEFORE INSERT ON {TABLE}
     FOR EACH ROW EXECUTE FUNCTION {TABLE}_chain_link()
+""",
+)
+
+# ADR-0006 puts views per consumer over the table "rather than each consumer querying
+# raw", so that the table can change shape without every consumer changing with it.
+# Only the two consumers whose shape is knowable now get one. A per-agent detail panel
+# reads `audit_control_room` filtered by subject_id, and a view that only hard-codes a
+# WHERE clause a caller must supply anyway would earn nothing.
+_VIEW_DDL = (
+    f"""
+CREATE OR REPLACE VIEW audit_control_room AS
+    SELECT seq, ts, actor, event_type, subject_id, reason_code, payload
+    FROM {TABLE}
+""",
+    f"""
+CREATE OR REPLACE VIEW audit_refusals AS
+    SELECT seq, ts, actor, event_type, subject_id, reason_code, payload
+    FROM {TABLE}
+    WHERE reason_code IS NOT NULL
 """,
 )
 

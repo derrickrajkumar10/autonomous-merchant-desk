@@ -31,13 +31,7 @@ See ADR-0006 for the decision, and CONTEXT.md §5 principle 5 for why it exists.
         assert trail.verify().ok
 """
 
-from desk.audit.entry import (
-    GENESIS_HASH,
-    AuditEntry,
-    canonical_bytes,
-    canonical_payload,
-    compute_hash,
-)
+from desk.audit.entry import GENESIS_HASH, AuditEntry, json_payload
 from desk.audit.schema import SchemaDrift, install_schema
 from desk.audit.trail import AuditTrail, ChainBreak, ChainVerification
 from desk.audit.vocabulary import (
@@ -58,8 +52,6 @@ __all__ = [
     "SchemaDrift",
     "UnknownEventType",
     "UnknownReasonCode",
-    "canonical_bytes",
-    "canonical_payload",
-    "compute_hash",
     "install_schema",
+    "json_payload",
 ]

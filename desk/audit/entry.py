@@ -36,11 +36,14 @@ def _dumps(document: Any) -> str:
     )
 
 
-def canonical_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """Normalise a payload to what will survive a round trip through ``jsonb``.
+def json_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Check a payload is storable, and return it as plain JSON types.
 
-    Raises ``ValueError`` if the payload could not be stored and read back unchanged,
-    because an entry that does not verify later is worse than a write that fails now.
+    Raises ``ValueError`` rather than letting an unstorable payload through, because
+    a write that fails now is better than an entry that fails to verify later.
+
+    This is not the last word on the payload's shape: Postgres normalises ``jsonb``
+    further, and the hash is taken over *that* form. See ``AuditTrail.record``.
     """
     if not isinstance(payload, Mapping):
         raise ValueError(f"an audit payload must be a mapping, not {type(payload).__name__}")
@@ -50,60 +53,29 @@ def canonical_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         text = _dumps(dict(payload))
     except (TypeError, ValueError) as exc:
         raise ValueError(f"an audit payload must be JSON-serialisable: {exc}") from exc
-    normalised: dict[str, Any] = json.loads(text)
-    return normalised
+    plain: dict[str, Any] = json.loads(text)
+    return plain
 
 
-def canonical_bytes(
-    *,
-    seq: int,
-    ts: datetime,
-    actor: str,
-    event_type: EventType,
-    subject_id: str,
-    reason_code: ReasonCode | None,
-    payload: Mapping[str, Any],
-    prev_hash: str,
-) -> bytes:
-    """The exact bytes an entry's hash is taken over."""
-    if ts.tzinfo is None:
+def _canonical_bytes(entry: AuditEntry) -> bytes:
+    """The exact bytes an entry's hash is taken over.
+
+    Sorted keys, no incidental whitespace, timestamps normalised to UTC — so that two
+    readers of the same entry always hash the same bytes.
+    """
+    if entry.ts.tzinfo is None:
         raise ValueError("an audit timestamp must carry a timezone")
     document = {
-        "seq": seq,
-        "ts": ts.astimezone(UTC).isoformat(),
-        "actor": actor,
-        "event_type": EventType(event_type).value,
-        "subject_id": subject_id,
-        "reason_code": None if reason_code is None else ReasonCode(reason_code).value,
-        "payload": dict(payload),
-        "prev_hash": prev_hash,
+        "seq": entry.seq,
+        "ts": entry.ts.astimezone(UTC).isoformat(),
+        "actor": entry.actor,
+        "event_type": EventType(entry.event_type).value,
+        "subject_id": entry.subject_id,
+        "reason_code": (None if entry.reason_code is None else ReasonCode(entry.reason_code).value),
+        "payload": dict(entry.payload),
+        "prev_hash": entry.prev_hash,
     }
     return _dumps(document).encode("utf-8")
-
-
-def compute_hash(
-    *,
-    seq: int,
-    ts: datetime,
-    actor: str,
-    event_type: EventType,
-    subject_id: str,
-    reason_code: ReasonCode | None,
-    payload: Mapping[str, Any],
-    prev_hash: str,
-) -> str:
-    return hashlib.sha256(
-        canonical_bytes(
-            seq=seq,
-            ts=ts,
-            actor=actor,
-            event_type=event_type,
-            subject_id=subject_id,
-            reason_code=reason_code,
-            payload=payload,
-            prev_hash=prev_hash,
-        )
-    ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -127,14 +99,9 @@ class AuditEntry:
     hash: str
 
     def recompute_hash(self) -> str:
-        """The hash this entry's own contents imply. Equals ``hash`` unless altered."""
-        return compute_hash(
-            seq=self.seq,
-            ts=self.ts,
-            actor=self.actor,
-            event_type=self.event_type,
-            subject_id=self.subject_id,
-            reason_code=self.reason_code,
-            payload=self.payload,
-            prev_hash=self.prev_hash,
-        )
+        """The hash this entry's own contents imply. Equals ``hash`` unless altered.
+
+        This is how anyone holding the entries verifies them — the control room, the
+        metrics, or a judge with a dump of the table and no Postgres to hand.
+        """
+        return hashlib.sha256(_canonical_bytes(self)).hexdigest()
