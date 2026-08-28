@@ -21,7 +21,9 @@ from pathlib import Path
 import pytest
 from psycopg_pool import ConnectionPool
 
-from desk.audit import AuditTrail, install_schema
+from desk.audit import AuditTrail
+from desk.audit import install_schema as install_audit_schema
+from desk.identity import install_schema as install_identity_schema
 
 
 @pytest.fixture(scope="session")
@@ -49,7 +51,7 @@ def database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
 
 @pytest.fixture
 def pool(database_url: str) -> Iterator[ConnectionPool]:
-    """A pool over a database holding nothing but a freshly installed trail."""
+    """A pool over a database holding nothing but a freshly installed Desk."""
     with ConnectionPool(database_url, min_size=1, max_size=8, open=True) as pool:
         with pool.connection() as conn:
             # CASCADE, because the per-consumer views sit on the table.
@@ -58,7 +60,9 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
             conn.execute("DROP TYPE IF EXISTS audit_reason_code")
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_append_only")
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_chain_link")
-            install_schema(conn)
+            conn.execute("DROP TABLE IF EXISTS agent_identity")
+            install_audit_schema(conn)
+            install_identity_schema(conn)
         yield pool
 
 

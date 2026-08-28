@@ -79,12 +79,18 @@ class AuditTrail:
         subject_id: str,
         payload: Mapping[str, Any],
         reason_code: ReasonCode | str | None = None,
+        conn: Connection[Any] | None = None,
     ) -> AuditEntry:
         """Write one entry and return it as written.
 
         ``payload`` carries the reasoning, the evidence and the resulting state change
         (FR-10.1). Everything that can be validated without a connection is validated
         first, so a rejected write leaves no trace and no gap in the sequence.
+
+        Pass ``conn`` to enlist the entry in a caller's own transaction, so that a
+        state change and the record of it commit together or not at all. A subsystem
+        that wrote its state and then failed to write the entry would leave the trail
+        disagreeing with reality, which is the one thing the trail may never do.
 
         The hash is taken over the payload as **Postgres** will hold it, not as Python
         wrote it. ``jsonb`` normalises some numbers (``1e+16`` is stored as
@@ -99,41 +105,70 @@ class AuditTrail:
         subject_id = _required(subject_id, "subject_id")
         body = json_payload(payload)
 
-        with self._pool.connection() as conn:
-            conn.execute("SELECT pg_advisory_xact_lock(%s)", (_CHAIN_LOCK_KEY,))
-            head = self._head(conn)
-            stored_payload, ts = _one(
-                conn.execute("SELECT %s::jsonb, clock_timestamp()", (Jsonb(body),))
-            )
-
-            draft = AuditEntry(
-                seq=1 if head is None else head.seq + 1,
-                ts=ts,
+        if conn is not None:
+            return self._append(
+                conn,
                 actor=actor,
-                event_type=event,
+                event=event,
                 subject_id=subject_id,
-                reason_code=reason,
-                payload=stored_payload,
-                prev_hash=GENESIS_HASH if head is None else head.hash,
-                hash="",
+                reason=reason,
+                body=body,
             )
-            entry = dataclasses.replace(draft, hash=draft.recompute_hash())
+        with self._pool.connection() as pooled:
+            return self._append(
+                pooled,
+                actor=actor,
+                event=event,
+                subject_id=subject_id,
+                reason=reason,
+                body=body,
+            )
 
-            conn.execute(
-                f"INSERT INTO {TABLE} ({_COLUMNS}) VALUES"
-                f" (%s, %s, %s, %s::audit_event_type, %s, %s::audit_reason_code, %s, %s, %s)",
-                (
-                    entry.seq,
-                    entry.ts,
-                    entry.actor,
-                    entry.event_type.value,
-                    entry.subject_id,
-                    None if entry.reason_code is None else entry.reason_code.value,
-                    Jsonb(entry.payload),
-                    entry.prev_hash,
-                    entry.hash,
-                ),
-            )
+    def _append(
+        self,
+        conn: Connection[Any],
+        *,
+        actor: str,
+        event: EventType,
+        subject_id: str,
+        reason: ReasonCode | None,
+        body: dict[str, Any],
+    ) -> AuditEntry:
+        """The write itself, on whichever transaction it belongs to."""
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (_CHAIN_LOCK_KEY,))
+        head = self._head(conn)
+        stored_payload, ts = _one(
+            conn.execute("SELECT %s::jsonb, clock_timestamp()", (Jsonb(body),))
+        )
+
+        draft = AuditEntry(
+            seq=1 if head is None else head.seq + 1,
+            ts=ts,
+            actor=actor,
+            event_type=event,
+            subject_id=subject_id,
+            reason_code=reason,
+            payload=stored_payload,
+            prev_hash=GENESIS_HASH if head is None else head.hash,
+            hash="",
+        )
+        entry = dataclasses.replace(draft, hash=draft.recompute_hash())
+
+        conn.execute(
+            f"INSERT INTO {TABLE} ({_COLUMNS}) VALUES"
+            f" (%s, %s, %s, %s::audit_event_type, %s, %s::audit_reason_code, %s, %s, %s)",
+            (
+                entry.seq,
+                entry.ts,
+                entry.actor,
+                entry.event_type.value,
+                entry.subject_id,
+                None if entry.reason_code is None else entry.reason_code.value,
+                Jsonb(entry.payload),
+                entry.prev_hash,
+                entry.hash,
+            ),
+        )
         return entry
 
     def query(

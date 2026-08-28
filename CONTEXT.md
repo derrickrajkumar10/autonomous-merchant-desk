@@ -232,6 +232,8 @@ trade-off rather than just the outcome.
   [ADR-0005](docs/adr/0005-check-five-can-only-refuse.md)
 - **Audit trail is a hash-chained append-only table** with a closed `reason_code` enum —
   [ADR-0006](docs/adr/0006-audit-trail-is-a-hash-chained-postgres-table.md)
+- **An agent's identity is its key's thumbprint** —
+  [ADR-0011](docs/adr/0011-agent-identity-is-the-key-thumbprint.md)
 - **Control room forks `pixel-agents`** —
   [ADR-0007](docs/adr/0007-control-room-forks-pixel-agents.md)
 - **Bank lines are synthesised; recon is never consumed** —

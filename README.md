@@ -89,6 +89,8 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 
 **No language model decides checks 1–4.** Cryptography where certainty matters; judgment only where language and patterns matter.
 
+Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md).
+
 ### It's a cycle, not a pipeline
 
 ```mermaid
@@ -174,7 +176,7 @@ The principal's key authorises spending. The agent's key only proves who is aski
 | Layer | Choice | Why |
 |:------|:-------|:----|
 | Payment mandates | **AP2** (Google, Apache 2.0) | Gives the signed envelope for a human's authorisation. Adopted, not reinvented. |
-| Agent identity | **Ours** | AP2 binds mandates to the user, not the agent, and leaves agent identity explicitly out of scope. That gap is where the identity registry and the reputation ladder live. |
+| Agent identity | **Ours, on AP2's binding** | AP2 binds the presenting agent's key into a mandate and stops there. What it leaves out is everything downstream — is this agent registered, what is its reputation, what ceiling does it get. That gap is where the identity registry and the reputation ladder live. |
 | Signing | **JWS over Ed25519** | Standard wrapper, so a third party can verify a receipt with an off-the-shelf library. |
 | Orchestration | **LangGraph** | Durable state, checkpointing, interrupts and retries — which matter when money moves. |
 | Payment rails | **Razorpay** (test mode) | Used as-is. |

@@ -144,6 +144,18 @@ with ConnectionPool(dsn) as pool:
 Appends serialise on a single advisory lock, so the sequence stays gapless and each
 entry chains onto the entry that really precedes it, however many writers are running.
 
+A subsystem writing state of its own passes its connection, so that the state change and
+the record of it commit together or not at all:
+
+```python
+with pool.connection() as conn:
+    conn.execute("INSERT INTO agent_identity ...")
+    trail.record(conn=conn, actor="desk", event_type=EventType.AGENT_REGISTERED, ...)
+```
+
+Writing the state and then failing to write the entry would leave the trail disagreeing
+with reality, which is the one thing it may never do.
+
 **Nothing updates or deletes.** That is enforced by the database, not by convention:
 `UPDATE`, `DELETE` and `TRUNCATE` on the table all raise. A correction is a new entry
 naming the earlier subject.
