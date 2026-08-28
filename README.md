@@ -144,6 +144,8 @@ Every decision — accepted, refused, negotiated, purchased, walked away from, m
 
 The chain means the log can't be quietly edited after the fact. The front-end and the published metrics both read from it — which is why nothing on screen is animated theatre. **If a character speaks, a real decision caused it.**
 
+Refusal reasons come from a closed set rather than free text, so they aggregate into a breakdown by check instead of scattering. Nothing in the system updates or deletes an entry — a correction is a new entry, and the database enforces that rather than trusting anyone to remember. The entry schema, the vocabularies and the chain are documented in [docs/audit-trail.md](docs/audit-trail.md).
+
 ---
 
 ## Vocabulary
