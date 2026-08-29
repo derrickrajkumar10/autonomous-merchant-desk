@@ -29,6 +29,7 @@ from jwt.api_jws import encode as jws_encode
 from desk.freshness import KEY_BINDING_TYP
 from desk.identity import AGENT_REQUEST_ALG, AGENT_REQUEST_TYP, AgentPublicKey
 from desk.mandate import sd_hash_of, split_presentation
+from desk.spine import AMOUNT, CHECKOUT, CURRENCY, ITEM_ID, PAYMENT
 
 #: Sixteen bytes, which is what RFC 9901's examples salt a disclosure with and is far
 #: past any birthday bound that matters here. The specification sets no length: it
@@ -115,3 +116,40 @@ class AgentKeypair:
             headers={"typ": typ},
         )
         return f"{sd_jwt}{hop}"
+
+    def request_purchase(
+        self,
+        *,
+        agent_id: str,
+        checkout: str,
+        payment: str,
+        item_id: str,
+        amount: str,
+        currency: str = "INR",
+    ) -> str:
+        """One signed purchase request: both mandates presented, and what is being asked.
+
+        This is everything a buyer agent sends the Desk before negotiation begins, in one
+        string. AP2 splits the authorisation in two, so both go: the open Checkout
+        Mandate saying what may be bought and the open Payment Mandate saying what may be
+        spent.
+
+        ``checkout`` and ``payment`` are **presentations** -- mandates with a key-binding
+        hop already attached by ``present`` -- and not bare mandates. Attaching the hops
+        is a separate step rather than something this method does, because a hop's nonce
+        and timestamp are the agent's to choose, and choosing them badly is what the red
+        team does. The two hops must carry **different** nonces: the Desk honours a nonce
+        once per agent, so a request that reuses one refuses its own second half.
+
+        ``amount`` is a decimal string for the same reason ``Money.of`` insists on one --
+        a price written as a float literal has already stopped being the price it was
+        written as before anything here sees it.
+        """
+        body = {
+            CHECKOUT: checkout,
+            PAYMENT: payment,
+            ITEM_ID: item_id,
+            AMOUNT: amount,
+            CURRENCY: currency,
+        }
+        return self.sign_request(body, agent_id=agent_id)
