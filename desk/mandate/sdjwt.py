@@ -41,6 +41,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from jwt.api_jws import decode as jws_decode
@@ -118,13 +119,48 @@ def read_mandate_header(mandate: str) -> MandateHeader:
     )
 
 
-def verify_sd_jwt(mandate: str, public_key: PrincipalPublicKey) -> dict[str, Any]:
+@dataclass(frozen=True)
+class MandateDigest:
+    """The digest naming one presentation, and the hash it was taken under.
+
+    The algorithm travels with the value because AP2 says which one to use rather
+    than fixing it: a ``payment.reference`` is hashed under "the ``_sd_alg``
+    algorithm for the SD-JWT this constraint is in, or ``sha-256`` if undefined"
+    (``docs/ap2/payment_mandate.md:231-235``). Two digests are only comparable when
+    they were taken alike, and a bare string would not say whether they were.
+    """
+
+    algorithm: str
+    value: str
+
+
+@dataclass(frozen=True)
+class Presentation:
+    """One verified mandate: what it proves, and the digest that names it.
+
+    The digest lives here rather than on the mandate because it is a fact about the
+    bytes that arrived, not about what they said. It is used twice -- a
+    ``payment.reference`` constraint names the open Checkout Mandate it belongs with by
+    digest, and the Desk keys a mandate's accumulated spend by it -- and ``digest_of``
+    explains why it is taken over the signed part alone.
+    """
+
+    claims: dict[str, Any]
+    digest: MandateDigest
+    mandate_id: MandateDigest
+
+
+def verify_presentation(mandate: str, public_key: PrincipalPublicKey) -> Presentation:
     """The claims this mandate proves, with every disclosure resolved into place.
 
     Refuses rather than returns whenever the answer would be partly guessed: a
     signature that does not verify, a hash we do not implement, a disclosure that
     does not belong. The caller gets claims it can rely on or a sentence saying why
     there are none.
+
+    Numbers arrive as ``Decimal`` rather than ``float``. A mandate's ceiling is money,
+    and ``1000.10`` is not a float; parsing it as one would leave the Desk drawing a
+    balance down by a number the principal did not sign.
     """
     issuer_jws = _issuer_jws(mandate)
     header = read_mandate_header(mandate)
@@ -141,13 +177,100 @@ def verify_sd_jwt(mandate: str, public_key: PrincipalPublicKey) -> dict[str, Any
         ) from exc
 
     try:
-        claims = json.loads(signed)
+        claims = json.loads(signed, parse_float=Decimal)
     except ValueError as exc:
         raise MandateNotVerified(f"the signed mandate claims are not JSON: {exc}") from exc
     if not isinstance(claims, dict):
         raise MandateNotVerified("the signed mandate claims are not a JSON object")
 
-    return _resolve(claims, _disclosures(mandate, _hash_for(claims.get(SD_ALG_CLAIM))))
+    algorithm = _sd_alg(claims.get(SD_ALG_CLAIM))
+    resolved = _resolve(claims, _disclosures(mandate, _HASHES[algorithm]))
+    return Presentation(
+        claims=resolved,
+        digest=digest_of(mandate, algorithm=algorithm),
+        mandate_id=signed_digest_of(mandate, algorithm=algorithm),
+    )
+
+
+def verify_sd_jwt(mandate: str, public_key: PrincipalPublicKey) -> dict[str, Any]:
+    """The claims ``verify_presentation`` proves, for a caller with no use for a digest."""
+    return verify_presentation(mandate, public_key).claims
+
+
+def digest_of(mandate: str, *, algorithm: str = DEFAULT_SD_ALG) -> MandateDigest:
+    """The digest that names this mandate, taken over its issuer JWS.
+
+    **Over the signed part only, and this is load-bearing.** The obvious thing to hash
+    is the whole presentation as received, which is what RFC 9901 does for a disclosure
+    and for ``sd_hash``. It is wrong here, because the disclosures are a *set* and their
+    order on the wire is the holder's to choose: two presentations of one signed mandate
+    with the disclosures swapped verify to identical claims and would hash differently.
+
+    The Desk keys a mandate's accumulated spend by this digest. A digest that varied
+    with disclosure order would therefore hand a holder a fresh ceiling for each
+    ordering -- an ``n!``-times-over double spend, on exactly the multi-disclosure
+    mandates AP2's own SDK emits.
+
+    The issuer JWS has no such freedom. It is the signature and what it covers, fixed
+    at issuance. And because the Desk verifies a mandate only when it is *fully*
+    disclosed (see ``_resolve``), the signed part determines the whole content: a
+    disclosure missing, added or altered is refused rather than resolved. One issuer
+    JWS is therefore one mandate, which is precisely what a spend accumulator needs to
+    be keyed by.
+
+    ``sd_hash`` on a key-binding JWT is a different job -- it binds one exact
+    presentation on purpose -- and check 4, which reads those, computes its own.
+    """
+    if algorithm not in _HASHES:
+        raise MandateNotVerified(
+            f"the Desk does not digest mandates under {algorithm!r}; it understands "
+            f"{', '.join(sorted(_HASHES))}"
+        )
+    return MandateDigest(
+        algorithm=algorithm, value=_digest(_issuer_jws(mandate), _HASHES[algorithm])
+    )
+
+
+def signed_digest_of(mandate: str, *, algorithm: str = DEFAULT_SD_ALG) -> MandateDigest:
+    """The digest of the bytes the principal's signature actually covers.
+
+    ``digest_of`` above stops one kind of malleability -- disclosure order -- and not
+    the other. A JWS is ``header.payload.signature``, and the signature is not part of
+    what it covers, so it can be varied while the mandate still verifies: base64url
+    leaves spare bits in the final character of a 64-byte ECDSA signature, and ECDSA
+    admits a second valid signature for every one it produces. One signed mandate can
+    therefore be presented under many issuer-JWS digests, every one of which passes
+    check 2 and reads back the same ceiling.
+
+    That is fatal for anything that keys *state*. An accumulated spend keyed by a
+    digest a holder can vary is an accumulated spend a holder can reset, and the
+    ceiling stops meaning anything. So the ledger is keyed by this instead: the signing
+    input, which nobody but the principal can alter, because altering it is precisely
+    what a signature check catches.
+
+    Distinct per issuance as well as per authorisation, since the signing input carries
+    the disclosure digests and every disclosure is freshly salted. A principal who
+    signs the same constraints twice gets two mandates with two ceilings, which is
+    right -- they authorised twice.
+
+    ``digest_of`` remains the one to compare for AP2's ``payment.reference``, because
+    the specification fixes what that names and we do not get to choose. Pairing is
+    safe under it anyway: the reference sits *inside* the signed payment mandate, so a
+    mangled checkout mandate fails to match and the pair is refused rather than
+    accepted.
+    """
+    if algorithm not in _HASHES:
+        raise MandateNotVerified(
+            f"the Desk does not digest mandates under {algorithm!r}; it understands "
+            f"{', '.join(sorted(_HASHES))}"
+        )
+    issuer_jws = _issuer_jws(mandate)
+    signing_input, separator, _signature = issuer_jws.rpartition(".")
+    if not separator or "." not in signing_input:
+        raise MandateNotVerified(
+            "the mandate's issuer JWS is not a header, a payload and a signature"
+        )
+    return MandateDigest(algorithm=algorithm, value=_digest(signing_input, _HASHES[algorithm]))
 
 
 def _issuer_jws(mandate: str) -> str:
@@ -179,21 +302,21 @@ def _issuer_jws(mandate: str) -> str:
     return issuer_jws
 
 
-def _hash_for(claimed: Any) -> Any:
-    """The hash the digests were taken under.
+def _sd_alg(claimed: Any) -> str:
+    """Which hash the digests were taken under, by name.
 
     An algorithm we do not implement is a refusal, never a fallback to the default:
     hashing the disclosures with the wrong function would resolve nothing and read as
     a holder who simply withheld everything.
     """
     if claimed is None:
-        return _HASHES[DEFAULT_SD_ALG]
+        return DEFAULT_SD_ALG
     if not isinstance(claimed, str) or claimed not in _HASHES:
         raise MandateNotVerified(
             f"the mandate's disclosure digests name {claimed!r}, which the Desk does "
             f"not implement; it understands {', '.join(sorted(_HASHES))}"
         )
-    return _HASHES[claimed]
+    return claimed
 
 
 @dataclass(frozen=True)
@@ -244,7 +367,7 @@ def _digest(segment: str, hash_alg: Any) -> str:
 
 def _parse_disclosure(segment: str) -> _Disclosure:
     try:
-        decoded = json.loads(base64url_decode(segment))
+        decoded = json.loads(base64url_decode(segment), parse_float=Decimal)
     except (ValueError, TypeError) as exc:
         raise MandateNotVerified(f"a disclosure in the mandate is not readable: {exc}") from exc
 

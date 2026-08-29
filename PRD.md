@@ -64,8 +64,11 @@ Key separation to keep clear everywhere in the code:
   ours, not AP2's**: v0.2 has no natural-language restatement field, so we carry it
   as our own claim and say so in FR-11.3.
 - **FR-1.3** Sign the mandate with the **principal's** key (held in the wallet,
-  never by the buyer agent). Structure follows AP2 v0.2's **open Checkout Mandate**
-  (`mandate.checkout.open.1`). There is no Intent Mandate in v0.2 — see CONTEXT.md §4.
+  never by the buyer agent). One errand is **two** mandates, following AP2 v0.2: an
+  **open Checkout Mandate** (`mandate.checkout.open.1`) saying what may be bought and an
+  **open Payment Mandate** (`mandate.payment.open.1`) saying what may be spent, the
+  latter naming the former by digest in a `payment.reference` constraint. There is no
+  Intent Mandate in v0.2 — see CONTEXT.md §4.
 - **FR-1.4** The mandate binds the agent permitted to present it, by carrying that
   agent's **public key in a `cnf` claim** (RFC 7800), which AP2 makes a MUST on open
   mandates. A stolen mandate is therefore unusable without the agent's private key,
@@ -93,7 +96,7 @@ trail.
 |---|---|---|---|
 | 1 | **Identity** — signature verifies against a registered public key | Deterministic | `agent_signature_invalid` |
 | 2 | **Mandate validity** — principal's signature verifies, mandate not expired, presenting agent's key matches the mandate's `cnf` claim | Deterministic | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
-| 3 | **Spend authority** — amount within remaining balance, category matches, still inside validity window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised` |
+| 3 | **Spend authority** — the two mandates pair, category matches, amount within the remaining balance, still inside the `payment.execution_date` window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised`, `outside_validity_window` |
 | 4 | **Replay & freshness** — nonce unseen, timestamp inside window | Deterministic | `nonce_replayed`, `request_stale` |
 | 5 | **Content & behaviour inspection** — is this text information or an instruction aimed at the Desk? Does this agent's behaviour pattern look like probing, salami-slicing, or trust farming? | **Judgment (LLM + learned model)** | `prompt_injection_detected`, `escalation_pattern_detected` |
 
@@ -102,11 +105,12 @@ trail.
 - **FR-3.2** Check 5 has two parts: an LLM reasoning pass over message content,
   and a learned behavioural model over the agent's request history (sequence,
   timing, amount escalation).
-- **FR-3.3** Partial spend is tracked per mandate against the mandate's
-  **`payment.budget`** constraint: the requested amount plus the sum of amounts from
-  previously closed Payment Mandates must be at or under `max`, and the amount is added
-  to the accumulated total after approval. The mandate stays immutable; the accumulator
-  is Desk-side state (ADR-0004). This, with FR-3.4, closes the replay hole.
+- **FR-3.3** Partial spend is tracked per mandate against the **open Payment
+  Mandate's `payment.budget`** constraint: the requested amount plus the sum of amounts
+  from previously closed Payment Mandates must be at or under `max`, and the amount is
+  added to the accumulated total after approval. The mandate stays immutable; the
+  accumulator is Desk-side state keyed by the Payment Mandate's digest (ADR-0004). This,
+  with FR-3.4, closes the replay hole.
 - **FR-3.4** Seen nonces are persisted and checked. Requests older than a short
   configurable window are refused.
 

@@ -90,9 +90,11 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 **No language model decides checks 1–4.** Cryptography where certainty matters; judgment only where language and patterns matter.
 
 Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md);
-check 2 and the AP2 mandate library in [docs/mandates.md](docs/mandates.md). Both directions of
-AP2 conformance — a mandate Google's SDK produced verifying in ours, and one of ours verifying in
-theirs — are exercised as tests, not asserted in prose.
+check 2 and the AP2 mandate library in [docs/mandates.md](docs/mandates.md); check 3, the
+`payment.budget` ceiling and the accumulator that draws it down in
+[docs/spend-authority.md](docs/spend-authority.md). Both directions of AP2 conformance — a mandate
+Google's SDK produced verifying in ours, and one of ours verifying in theirs, for the open Checkout
+and open Payment Mandate alike — are exercised as tests, not asserted in prose.
 
 ### It's a cycle, not a pipeline
 

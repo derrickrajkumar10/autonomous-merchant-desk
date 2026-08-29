@@ -33,7 +33,13 @@ from jwt.api_jws import encode as jws_encode
 from jwt.utils import base64url_encode
 
 from desk.identity import AgentPublicKey, PrincipalPublicKey
-from desk.mandate import MANDATE_ALG, OPEN_CHECKOUT_VCT
+from desk.mandate import (
+    MANDATE_ALG,
+    OPEN_CHECKOUT_VCT,
+    OPEN_PAYMENT_VCT,
+    PAYMENT_REFERENCE_CONSTRAINT,
+    digest_of,
+)
 
 #: The ``typ`` RFC 9901's own reference implementation stamps on an SD-JWT, and
 #: therefore what AP2's SDK emits. Ours says the same thing so that a stranger's
@@ -96,6 +102,53 @@ class PrincipalKeypair:
             content["iat"] = issued_at
         if expires_at is not None:
             content["exp"] = expires_at
+        return self.sign_mandate_content(content, principal_id=principal_id)
+
+    def sign_open_payment_mandate(
+        self,
+        *,
+        principal_id: str,
+        agent_key: AgentPublicKey,
+        for_checkout: str,
+        constraints: Sequence[Mapping[str, Any]] = (),
+        issued_at: int | None = None,
+        expires_at: int | None = None,
+        execution_date: str | None = None,
+    ) -> str:
+        """One open Payment Mandate, paired to the Checkout Mandate it pays for.
+
+        ``for_checkout`` is the *presented* open Checkout Mandate, not its digest. The
+        wallet takes the digest itself and writes it into the ``payment.reference``
+        constraint AP2 makes mandatory, because pairing the two is exactly the step a
+        buyer agent must not be trusted to do: an agent that chose the reference could
+        pair a generous budget with somebody else's shopping list.
+
+        The digest is taken under sha-256, which is the ``_sd_alg`` this wallet signs
+        under, satisfying AP2's rule that the hash match the SD-JWT the constraint sits
+        in.
+
+        ``constraints`` are the rest -- a ``payment.budget`` ceiling, a
+        ``payment.execution_date`` window. None of them is required by the schema, and
+        the wallet adds none on its own: what a principal did not authorise is not for
+        their wallet to invent.
+        """
+        content: dict[str, Any] = {
+            "vct": OPEN_PAYMENT_VCT,
+            "constraints": [
+                {
+                    "type": PAYMENT_REFERENCE_CONSTRAINT,
+                    "conditional_transaction_id": digest_of(for_checkout).value,
+                },
+                *(dict(constraint) for constraint in constraints),
+            ],
+            "cnf": {"jwk": agent_key.jwk()},
+        }
+        if issued_at is not None:
+            content["iat"] = issued_at
+        if expires_at is not None:
+            content["exp"] = expires_at
+        if execution_date is not None:
+            content["execution_date"] = execution_date
         return self.sign_mandate_content(content, principal_id=principal_id)
 
     def sign_mandate_content(self, content: Mapping[str, Any], *, principal_id: str) -> str:

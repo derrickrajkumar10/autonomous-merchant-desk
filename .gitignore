@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+# The throwaway environment pyproject.toml documents for the AP2 SDK.
+.venv-conformance/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

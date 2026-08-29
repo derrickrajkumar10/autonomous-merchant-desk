@@ -16,6 +16,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from desk.audit.vocabulary import EventType, ReasonCode
@@ -23,6 +24,24 @@ from desk.audit.vocabulary import EventType, ReasonCode
 #: What the first entry chains onto. Sixty-four zeroes, so it is the right shape for
 #: the column and unmistakable on sight.
 GENESIS_HASH = "0" * 64
+
+
+def _decimal_as_text(value: Any) -> str:
+    """Render a ``Decimal`` as the text it was written as, and refuse anything else.
+
+    Money is a ``Decimal`` everywhere it matters, and mandate claims are parsed with
+    ``parse_float=Decimal``, so one can reach a payload from two directions: evidence
+    the Desk assembles, and any number a counterparty put in a mandate the Desk records
+    verbatim. Serialising it as a float would put a number in the record that differs
+    from the number that was evaluated; refusing it would mean a mandate carrying a
+    decimal anywhere could make a check raise instead of writing its entry, which is
+    worse -- a refusal nobody recorded.
+
+    A string, because that is what an exact amount survives as in JSON.
+    """
+    if isinstance(value, Decimal):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def _dumps(document: Any) -> str:
@@ -33,6 +52,7 @@ def _dumps(document: Any) -> str:
         separators=(",", ":"),
         ensure_ascii=False,
         allow_nan=False,
+        default=_decimal_as_text,
     )
 
 

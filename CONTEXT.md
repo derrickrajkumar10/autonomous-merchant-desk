@@ -82,6 +82,9 @@ v0.1, whose models still sit in the AP2 repo and are easy to mistake for current
   what makes a stolen mandate useless to a different agent.
 - **`payment.budget` constraint** — a spend ceiling drawn down across presentations, with a
   normative evaluation rule. The mandate stays immutable; the accumulator is verifier-side state.
+  It is a constraint on the **open Payment Mandate**, not on the Checkout Mandate, so a buyer
+  agent presents both: one saying what may be bought, one saying what may be spent. AP2 pairs
+  them by digest through the Payment Mandate's mandatory `payment.reference` constraint.
 - Mandates are **SD-JWT** signed credentials carrying timestamp, expiry, nonce and signer key
   reference, so replay and freshness checks come nearly free. Note `iat`/`exp` sit on the mandate
   while `nonce`/`aud` sit on the key-binding hop — check 4 therefore reads two layers.

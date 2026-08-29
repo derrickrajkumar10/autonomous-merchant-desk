@@ -7,11 +7,18 @@ Check 1 established *who is asking*. This is the second half of the sentence:
 This document is the contract an external buyer agent and an external wallet code
 against: what a mandate is, what the Desk checks about one, and what it refuses.
 
-The shape is not ours. It is **AP2 v0.2**'s open Checkout Mandate
-(`mandate.checkout.open.1`), secured as an SD-JWT ([RFC 9901](https://www.rfc-editor.org/rfc/rfc9901.html)),
-carrying the presenting agent's public key in a `cnf` claim (RFC 7800). Field-level
-citations are in [the research note](research/ap2-mandate-model.md) §1a; the reasoning a
-newcomer wants is in [the explainer](explainers/ticket-03-mandate-library.md).
+The shape is not ours. It is **AP2 v0.2**'s, secured as an SD-JWT
+([RFC 9901](https://www.rfc-editor.org/rfc/rfc9901.html)), carrying the presenting agent's
+public key in a `cnf` claim (RFC 7800). Field-level citations are in
+[the research note](research/ap2-mandate-model.md) §1a; the reasoning a newcomer wants is
+in [the explainer](explainers/ticket-03-mandate-library.md).
+
+**One errand is two mandates.** AP2 v0.2 splits them: the open Checkout Mandate
+(`mandate.checkout.open.1`) below says *what may be bought*, and an open Payment Mandate
+(`mandate.payment.open.1`) says *what may be spent* — the ceiling, the currency and the
+execution window. This document covers the first and the three questions check 2 asks of
+either; the second, and everything check 3 does with it, is in
+[docs/spend-authority.md](spend-authority.md).
 
 Decisions behind it: [ADR-0002](adr/0002-jws-ed25519-for-all-signing.md) for why a
 mandate is ES256 while everything else is Ed25519.
@@ -110,15 +117,29 @@ Re-enrolling the same key is idempotent; a different key is refused with
 ## Using it
 
 ```python
-outcome = MandateCheck(PrincipalDirectory(pool), trail).verify(mandate, presented_by=identity)
+check = MandateCheck(PrincipalDirectory(pool), trail)
+
+outcome = check.verify(checkout_mandate, presented_by=identity)
 outcome.passed          # bool
 outcome.mandate         # OpenCheckoutMandate on a pass, None on a refusal
+outcome.digest          # MandateDigest naming the presentation; None on a refusal
 outcome.reason_code     # None on a pass
 outcome.entry           # the audit entry this outcome wrote
+
+payment = check.verify_payment(payment_mandate, presented_by=identity)
+payment.mandate         # OpenPaymentMandate on a pass
 ```
+
+The same three questions either way — they are questions about a mandate rather than
+about a kind of mandate. Whether the two *belong together* is check 3's, because the
+answer is a constraint inside one of them rather than a property of either.
 
 `presented_by` is check 1's `IdentityOutcome.identity` — an agent the Desk has just
 authenticated, not a name a caller supplied.
+
+`digest` is base64url of SHA-256 over the presentation exactly as received. Check 3 needs
+it to pair the two mandates and to key the accumulated spend, and re-deriving it there
+would mean digesting a string nobody had checked was the one that verified.
 
 ## In the trail
 
@@ -178,7 +199,8 @@ Two boundaries to know about, both of which check 4 will meet:
 ## What this is not
 
 - **Not spend authority.** Whether the amount asked for is inside the constraints, and
-  the `payment.budget` ceiling drawn down across deals, is check 3.
+  the `payment.budget` ceiling drawn down across deals, is check 3 —
+  [docs/spend-authority.md](spend-authority.md).
 - **Not freshness.** A mandate presented twice passes here twice. Check 4 owns the nonce
   and the window, which live on the presentation hop rather than on the mandate.
 - **Not the closed mandate.** The specific negotiated deal is a later ticket.

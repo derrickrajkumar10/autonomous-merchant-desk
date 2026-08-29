@@ -397,6 +397,12 @@ question is whether what is being asked for now is inside it: the amount against
 down across deals without the mandate ever being rewritten — the mandate stays
 immutable and the running total is the Desk's own state.
 
+*Written after the fact:* that paragraph says "the mandate", and ticket 04 found the
+word was doing too much work. `payment.budget` is an open **Payment** Mandate
+constraint, and this ticket built only the open Checkout Mandate — so an errand turns
+out to be two mandates, paired by digest. See
+[the ticket 04 explainer](ticket-04-spend-authority.md) §4.
+
 Which is the same shape as before: check 3 is only meaningful because check 2 exists.
 There is no point measuring a spend against an authorisation until you know the
 authorisation is real.

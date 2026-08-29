@@ -16,7 +16,13 @@ from typing import Any
 import pytest
 
 from desk.identity import PrincipalPublicKey
-from desk.mandate import MandateNotVerified, read_mandate_header, verify_sd_jwt
+from desk.mandate import (
+    MandateNotVerified,
+    digest_of,
+    read_mandate_header,
+    verify_presentation,
+    verify_sd_jwt,
+)
 from tests.mandate.conftest import PRINCIPAL_ID, line_items
 from world.agents.keys import AgentKeypair
 from world.wallet import PrincipalKeypair
@@ -289,3 +295,54 @@ def test_an_object_property_disclosure_is_resolved(wallet: PrincipalKeypair) -> 
     claims = verify_sd_jwt(f"{signed}~{disclosure}~", wallet.public_key)
 
     assert claims == {"vct": "mandate.checkout.open.1"}
+
+
+def test_re_ordering_the_disclosures_does_not_change_the_mandates_digest(
+    wallet: PrincipalKeypair, agent: AgentKeypair
+) -> None:
+    """The digest names the mandate, not the order its parts arrived in.
+
+    Disclosures are a set, and which order they go on the wire in is the holder's to
+    choose. A digest taken over the whole presentation would therefore differ between
+    two presentations of *one signed mandate* whose parts were swapped -- and since the
+    Desk keys a mandate's accumulated spend by that digest, each ordering would come
+    with a fresh ceiling. That is a double spend, ``n!`` times over, on exactly the
+    multi-disclosure mandates AP2's own SDK emits.
+
+    Both orderings below verify to identical claims. They must therefore be one mandate
+    to the accumulator as well.
+    """
+    only_us = {"type": "checkout.allowed_merchants", "allowed": [{"id": "stitchai"}]}
+    disclosures = [_array_disclosure(line_items()), _array_disclosure(only_us)]
+    content = {
+        "vct": "mandate.checkout.open.1",
+        "constraints": [{"...": _sha256(each)} for each in disclosures],
+        "cnf": {"jwk": agent.public_key.jwk()},
+        "exp": int(time.time()) + 3600,
+    }
+    outer = _array_disclosure(content)
+    signed = _sign_claims(
+        wallet, {"delegate_payload": [{"...": _sha256(outer)}], "_sd_alg": "sha-256"}
+    )
+
+    one = verify_presentation(
+        f"{signed}~{outer}~{disclosures[0]}~{disclosures[1]}~", wallet.public_key
+    )
+    swapped = verify_presentation(
+        f"{signed}~{outer}~{disclosures[1]}~{disclosures[0]}~", wallet.public_key
+    )
+
+    assert one.claims == swapped.claims
+    assert one.digest == swapped.digest
+
+
+def test_two_mandates_the_principal_signed_separately_have_different_digests(
+    wallet: PrincipalKeypair, agent: AgentKeypair
+) -> None:
+    """The other half. A digest that collapsed onto the signed part too far would key
+    two genuinely separate authorisations to one accumulator row, and the second would
+    inherit the first's spending."""
+    first = _mandate(wallet, agent)
+    second = _mandate(wallet, agent)
+
+    assert digest_of(first) != digest_of(second)

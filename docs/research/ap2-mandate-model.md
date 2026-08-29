@@ -155,6 +155,16 @@ There is a real design decision left over: whether our `exceeds_remaining_balanc
 `payment.budget` constraint carried in the mandate, or off a ceiling we store out-of-band. The former
 is interoperable; the latter is not.
 
+> **Settled 2026-08-29, building check 3 (ticket 04).** The constraint carried in the mandate — and
+> the mandate is the open **Payment** Mandate, which is the part that had gone unsaid. The open
+> Checkout Mandate's `constraints.items.anyOf` admits only `checkout.allowed_merchants` and
+> `checkout.line_items`, so a ceiling carried there would not validate in the SDK. A buyer agent
+> therefore presents both mandates, paired by the digest in the Payment Mandate's mandatory
+> `payment.reference` constraint, and the accumulator is keyed by the Payment Mandate's own digest —
+> the spec's "total amount spent using this Payment Mandate". Both directions are covered by
+> `tests/mandate/test_ap2_interop.py`. One narrowing: a Payment Mandate carrying **no**
+> `payment.budget` is refused rather than read as unlimited, which AP2 permits and we do not.
+
 ### C4. AP2 forbids Ed25519 for the Checkout JWT. ADR-0002 says Ed25519 for *all* signing.
 
 **Our claim** — ADR-0002, referenced from `CONTEXT.md` §8: "**JSON Web Signatures over Ed25519** for
@@ -664,8 +674,10 @@ Not decisions — the calls belong to whoever owns these documents.
 2. **`PRD.md` FR-1.4** — reframe as *implementing* AP2's `cnf` key binding, with the registry and
    reputation ladder as the layer above.
 3. **ADR-0004** — decision stands; fix the framing. Partial spend is `payment.budget`, not our
-   extension. Decide whether our balance keys off a `payment.budget` constraint in the mandate
-   (interoperable) or an out-of-band ceiling (not).
+   extension. ~~Decide whether our balance keys off a `payment.budget` constraint in the mandate
+   (interoperable) or an out-of-band ceiling (not).~~ **Done 2026-08-29** — the constraint in the
+   mandate, and specifically in the open *Payment* Mandate. See the note under C3 above and
+   ADR-0004's second amendment.
 4. **ADR-0002** — add a known-exception paragraph for the Checkout JWT: either ES256 there, or
    Ed25519 plus an explicit entropy salt, which `security_and_privacy_considerations.md:143-148`
    permits.
