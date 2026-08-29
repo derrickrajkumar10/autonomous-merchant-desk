@@ -38,6 +38,7 @@ from desk.identity.jws import (
     verify_request,
 )
 from desk.identity.keys import AGENT_ID_PREFIX, AgentPublicKey, PrincipalPublicKey
+from desk.identity.principals import Principal, PrincipalConflict, PrincipalDirectory
 from desk.identity.registry import AgentIdentity, AgentRegistry, RegistrationConflict
 from desk.identity.schema import install_schema
 
@@ -51,6 +52,9 @@ __all__ = [
     "AgentRegistry",
     "IdentityCheck",
     "IdentityOutcome",
+    "Principal",
+    "PrincipalConflict",
+    "PrincipalDirectory",
     "PrincipalPublicKey",
     "RegistrationConflict",
     "RequestHeader",

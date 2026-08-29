@@ -61,6 +61,7 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_append_only")
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_chain_link")
             conn.execute("DROP TABLE IF EXISTS agent_identity")
+            conn.execute("DROP TABLE IF EXISTS principal_key")
             install_audit_schema(conn)
             install_identity_schema(conn)
         yield pool

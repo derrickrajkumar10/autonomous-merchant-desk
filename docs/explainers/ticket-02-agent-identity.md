@@ -290,7 +290,7 @@ That gap — vague outside, precise inside — is a security property, not an ac
 |:---|:---|
 | [desk/identity/keys.py](../../desk/identity/keys.py) | `AgentPublicKey` and `PrincipalPublicKey`, plus the thumbprint |
 | [desk/identity/jws.py](../../desk/identity/jws.py) | the wire format, and reading/verifying a request |
-| [desk/identity/schema.py](../../desk/identity/schema.py) | the registry table (five columns, no private keys) |
+| [desk/identity/schema.py](../../desk/identity/schema.py) | the registry table (five columns, no private keys); ticket 03 added the principal directory beside it |
 | [desk/identity/registry.py](../../desk/identity/registry.py) | registering and looking up agents |
 | [desk/identity/check.py](../../desk/identity/check.py) | check 1 itself |
 | [world/agents/keys.py](../../world/agents/keys.py) | the **agent's** side: generating a keypair and signing |
@@ -303,14 +303,20 @@ never live somewhere `desk/` could reach it, and the folder boundary makes that 
 Two types, not one, for keys:
 
 ```python
-class AgentPublicKey(_Ed25519PublicKey):      # proves who is asking
-class PrincipalPublicKey(_Ed25519PublicKey):  # authorises spending
+class AgentPublicKey:      # proves who is asking       — Ed25519, 32 bytes
+class PrincipalPublicKey:  # authorises spending        — ECDSA P-256, 65 bytes
 ```
 
-They hold identical bytes and are deliberately **not** interchangeable. Passing a
-principal's key where an agent's key belongs is an error your editor catches, and a
-`TypeError` at runtime if it somehow gets that far. That is the section-1 distinction
-made structural, so it cannot be eroded by a careless line of code two months from now.
+They are deliberately **not** interchangeable. Passing a principal's key where an agent's
+key belongs is caught by your editor, and is a `TypeError` at runtime if it somehow gets
+that far. That is the section-1 distinction made structural, so it cannot be eroded by a
+careless line of code two months from now.
+
+*(As shipped in this ticket both were Ed25519 and differed only in name. Ticket 03 moved
+principal keys to ECDSA P-256, because AP2's SDK can neither sign nor verify an Ed25519
+mandate — see [its explainer](ticket-03-mandate-library.md) §8 and ADR-0002. The
+separation is now one of scheme rather than of name, which only makes it harder to
+erode.)*
 
 ### Using it
 
@@ -422,7 +428,7 @@ That one line is the whole ticket in miniature.
 | **Principal** | The human whose money it is, on whose behalf an agent acts. |
 | **Agent identity** | The agent's registered keypair. Proves *who is asking*, never *what is authorised*. |
 | **Keypair** | A private half that signs and a public half that verifies. |
-| **Ed25519** | The specific signature scheme we use. Fast, small, everywhere. |
+| **Ed25519** | The signature scheme agent keys use. Fast, small, everywhere. (Mandates use ECDSA P-256 — ticket 03.) |
 | **JWS** | JSON Web Signature — the standard envelope: `header.payload.signature`. |
 | **base64url** | A way of writing bytes as safe text. Encoding, not encryption. |
 | **`kid`** | "Key ID" — which identity a message *claims* to be from. |

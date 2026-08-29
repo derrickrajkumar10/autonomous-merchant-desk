@@ -14,8 +14,9 @@ import pytest
 from psycopg_pool import ConnectionPool
 
 from desk.audit import AuditTrail, EventType, ReasonCode
-from desk.identity import AgentRegistry, PrincipalPublicKey, RegistrationConflict
+from desk.identity import AgentRegistry, RegistrationConflict
 from world.agents.keys import AgentKeypair
+from world.wallet import PrincipalKeypair
 
 
 def test_registration_issues_an_identity(registry: AgentRegistry) -> None:
@@ -124,11 +125,11 @@ def test_a_principal_must_be_named(registry: AgentRegistry) -> None:
 def test_a_principal_key_cannot_stand_in_for_an_agent_key(registry: AgentRegistry) -> None:
     """The principal's key authorises spending; the agent's key only proves who asks.
 
-    Structurally distinct types, so no path can accidentally treat one as the other.
+    Structurally distinct types, and since ticket 03 distinct signature schemes too --
+    so no path can accidentally treat one as the other, and no key can be reinterpreted
+    as the other kind even deliberately.
     """
-    principal_key = PrincipalPublicKey.from_base64url(
-        AgentKeypair.generate().public_key.base64url()
-    )
+    principal_key = PrincipalKeypair.generate().public_key
 
     with pytest.raises(TypeError):
         registry.register(

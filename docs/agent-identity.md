@@ -87,10 +87,12 @@ over a request, however valid it is, so what the signature is *over* is signed t
 ### `EdDSA`, and the one exception
 
 Agent requests are Ed25519 and a request naming any other algorithm is refused. The
-ES256 exception in [ADR-0002](adr/0002-jws-ed25519-for-all-signing.md) applies to the
-AP2 Checkout JWT alone — do not over-apply it. The algorithm a request named is written
-to the trail on every outcome, pass or refusal, so a wrong-algorithm path is visible
-rather than silent.
+ES256 exception in [ADR-0002](adr/0002-jws-ed25519-for-all-signing.md) covers the
+artefacts AP2's own tooling reads — the Checkout JWT and principal-signed mandates — and
+nothing else; do not over-apply it. Since ticket 03 that exception is enforced by the
+key types themselves: a `PrincipalPublicKey` is P-256 and cannot verify a request at all.
+The algorithm a request named is written to the trail on every outcome, pass or refusal,
+so a wrong-algorithm path is visible rather than silent.
 
 ---
 
@@ -150,8 +152,8 @@ as the ones that succeeded.
 
 ## What this is not
 
-- **Not authorisation.** Check 2 verifies the principal's mandate, check 3 the spend
-  against it.
+- **Not authorisation.** Check 2 verifies the principal's mandate ([the contract is
+  here](mandates.md)), check 3 the spend against it.
 - **Not freshness.** A signed request replayed a second time verifies here exactly as
   it did the first. Check 4 owns that.
 - **Not a session.** Requests are individually signed; there is nothing to log into and

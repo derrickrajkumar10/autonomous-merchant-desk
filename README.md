@@ -82,14 +82,17 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 | # | Check | Type | Refuses with |
 |:--|:------|:-----|:-------------|
 | **1** | **Identity** — signature verifies against a registered public key | Deterministic | `agent_signature_invalid` |
-| **2** | **Mandate validity** — principal's signature verifies, not expired, presenting agent matches the named agent | Deterministic | `mandate_expired`, `agent_mandate_mismatch` |
+| **2** | **Mandate validity** — principal's signature verifies, not expired, presenting agent's key matches the mandate's `cnf` binding | Deterministic | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
 | **3** | **Spend authority** — inside remaining balance, category authorised, inside the validity window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised` |
 | **4** | **Replay & freshness** — nonce unseen, timestamp inside window | Deterministic | `nonce_replayed`, `request_stale` |
 | **5** | **Content & behaviour** — is this information, or an instruction aimed at the desk? Does this agent's pattern look like probing or trust farming? | Judgment | `prompt_injection_detected`, `escalation_pattern_detected` |
 
 **No language model decides checks 1–4.** Cryptography where certainty matters; judgment only where language and patterns matter.
 
-Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md).
+Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md);
+check 2 and the AP2 mandate library in [docs/mandates.md](docs/mandates.md). Both directions of
+AP2 conformance — a mandate Google's SDK produced verifying in ours, and one of ours verifying in
+theirs — are exercised as tests, not asserted in prose.
 
 ### It's a cycle, not a pipeline
 

@@ -131,6 +131,8 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 | **Principal** | The human whose key signs a mandate. | User, owner, account |
 | **Agent identity** | The agent's own registered keypair — proves *who is asking*, not *what is authorised*. | Auth, credentials |
 | **Agent registry** | The Desk's record of every agent it has issued an identity to: public key, principal, identity, arrival. Holds no private keys and no authority. | Accounts, users, directory |
+| **Principal directory** | The Desk's record of which humans it honours mandates from, and under which public key. Configuration, not a record of counterparty behaviour: check 2 resolves a mandate's signing key through it rather than through anything the mandate claims. | Principal registry, key store, allowlist |
+| **Disclosure** | One part of a signed mandate, carried beside the signature rather than inside it. RFC 9901 lets a holder drop one; the Desk refuses a mandate that is not fully disclosed, because a constraint it cannot see is one it cannot honour. | Optional field, redaction |
 | **Trust score** | Per-agent reputation that gates spend ceiling and scrutiny tier. | Rating, karma |
 | **Spend ceiling** | The maximum a given agent may transact for, set by its rung on the ladder. Rungs have a minimum dwell time; that dwell time is the anti-farming mechanism. | Limit, quota |
 | **Scrutiny tier** | One of three discrete levels controlling how aggressively check 5 runs against an agent. | Strictness, mode |
@@ -235,6 +237,9 @@ trade-off rather than just the outcome.
   [ADR-0006](docs/adr/0006-audit-trail-is-a-hash-chained-postgres-table.md)
 - **An agent's identity is its key's thumbprint** —
   [ADR-0011](docs/adr/0011-agent-identity-is-the-key-thumbprint.md)
+- **Mandates are ES256 and agent requests are Ed25519** — the known exception in
+  [ADR-0002](docs/adr/0002-jws-ed25519-for-all-signing.md), widened in ticket 03 because
+  AP2's SDK can neither sign nor verify Ed25519
 - **Control room forks `pixel-agents`** —
   [ADR-0007](docs/adr/0007-control-room-forks-pixel-agents.md)
 - **Bank lines are synthesised; recon is never consumed** —
