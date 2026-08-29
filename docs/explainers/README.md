@@ -5,9 +5,8 @@ does not already know the answer.
 
 Each one starts with no jargon at all and adds detail in layers, so you can stop at the
 section where you have what you need. They are the *why* and the *how it fits together*;
-the terse contract docs beside them (`docs/audit-trail.md`, `docs/agent-identity.md`,
-`docs/mandates.md`, `docs/spend-authority.md`, `docs/freshness.md`) are the *what*, for
-someone already writing code against it.
+the *what* — the schemas, the exact signatures, the refusal tables — lives in the module
+docstrings, which is the one copy that cannot drift from the code it describes.
 
 | Ticket | Explainer | In one line |
 |:---|:---|:---|

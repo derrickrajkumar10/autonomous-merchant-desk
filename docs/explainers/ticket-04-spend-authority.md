@@ -440,9 +440,6 @@ outcome.remaining       # what closing would leave — a forecast, not a reserva
 accumulator.record_spend(verified_payment, amount=amount, conn=conn)
 ```
 
-The terse contract beside this — the schemas, the refusal table, the trail entries — is
-[docs/spend-authority.md](../spend-authority.md).
-
 ## 12. Glossary
 
 | Term | Meaning |

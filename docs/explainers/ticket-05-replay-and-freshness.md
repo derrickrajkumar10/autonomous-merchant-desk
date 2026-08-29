@@ -330,9 +330,6 @@ mis-parsed into a refusal about something else.
 | [desk/mandate/sdjwt.py](../../desk/mandate/sdjwt.py) | `split_presentation` and `sd_hash_of` — telling a proof from a disclosure |
 | [world/agents/keys.py](../../world/agents/keys.py) | the agent's side: `present`, which signs the proof |
 
-The terse contract, for someone writing code against it, is
-[docs/freshness.md](../freshness.md).
-
 ### Using it
 
 ```python

@@ -11,7 +11,6 @@ more. Stop wherever you have what you need — the code is at the end, not the s
 | **Issue** | [#18](https://github.com/derrickrajkumar10/autonomous-merchant-desk/issues/18), under spec [#2](https://github.com/derrickrajkumar10/autonomous-merchant-desk/issues/2) |
 | **Builds on** | Nothing. This is the first code in the repository. |
 | **Everything else builds on it** | Every later ticket either writes here or reads here. |
-| **Contract doc** | [docs/audit-trail.md](../audit-trail.md) — the terse version, for someone writing code against it |
 
 ---
 

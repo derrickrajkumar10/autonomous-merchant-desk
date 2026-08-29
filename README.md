@@ -89,11 +89,9 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 
 **No language model decides checks 1–4.** Cryptography where certainty matters; judgment only where language and patterns matter.
 
-Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md);
-check 2 and the AP2 mandate library in [docs/mandates.md](docs/mandates.md); check 3, the
-`payment.budget` ceiling and the accumulator that draws it down in
-[docs/spend-authority.md](docs/spend-authority.md); check 4, the key-binding hop and the
-nonce store behind it in [docs/freshness.md](docs/freshness.md). Both directions of AP2 conformance — a mandate
+Each check is explained in [docs/explainers/](docs/explainers/) — check 1 and the registry
+behind it, check 2 and the AP2 mandate library, check 3's `payment.budget` ceiling and the
+accumulator that draws it down, check 4's key-binding hop and nonce store. Both directions of AP2 conformance — a mandate
 Google's SDK produced verifying in ours, and one of ours verifying in theirs, for the open Checkout
 and open Payment Mandate alike — are exercised as tests, not asserted in prose.
 
@@ -152,7 +150,7 @@ Every decision — accepted, refused, negotiated, purchased, walked away from, m
 
 The chain means the log can't be quietly edited after the fact. The front-end and the published metrics both read from it — which is why nothing on screen is animated theatre. **If a character speaks, a real decision caused it.**
 
-Refusal reasons come from a closed set rather than free text, so they aggregate into a breakdown by check instead of scattering. Nothing in the system updates or deletes an entry — a correction is a new entry, and the database enforces that rather than trusting anyone to remember. The entry schema, the vocabularies and the chain are documented in [docs/audit-trail.md](docs/audit-trail.md).
+Refusal reasons come from a closed set rather than free text, so they aggregate into a breakdown by check instead of scattering. Nothing in the system updates or deletes an entry — a correction is a new entry, and the database enforces that rather than trusting anyone to remember. The entry schema, the vocabularies and the chain are explained in [docs/explainers/ticket-01-audit-trail.md](docs/explainers/ticket-01-audit-trail.md).
 
 ---
 

@@ -19,6 +19,12 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 Finishing a ticket includes writing `docs/explainers/ticket-NN-<slug>.md`, and adding its
 row to `docs/explainers/README.md`. This is part of the ticket, not a follow-up.
 
+**The explainer is the only prose doc a ticket owes.** There is no companion "contract"
+or reference page per subsystem — five of those existed and were deleted, because they
+restated module docstrings and were a second copy to keep true. The terse *what* belongs
+in the module docstring, next to the code it describes; the *why* belongs here. Do not
+reintroduce `docs/<subsystem>.md`.
+
 The reader is a third-year CS student: capable, but without the context the ticket was
 built in. So the file is **layered** — it opens with no jargon whatsoever and adds detail
 in sections, ending with the code. Someone should be able to stop three sections in and
