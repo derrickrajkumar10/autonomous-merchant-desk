@@ -1,0 +1,20 @@
+# Explainers
+
+One file per completed ticket, written to be read in order and to be read by someone who
+does not already know the answer.
+
+Each one starts with no jargon at all and adds detail in layers, so you can stop at the
+section where you have what you need. They are the *why* and the *how it fits together*;
+the terse contract docs beside them (`docs/audit-trail.md`, `docs/agent-identity.md`) are
+the *what*, for someone already writing code against it.
+
+| Ticket | Explainer | In one line |
+|:---|:---|:---|
+| 01 | *not yet written* | The append-only, hash-chained record every decision is written to. |
+| 02 | [Agent registration and identity](ticket-02-agent-identity.md) | An agent introduces itself once, then proves every message is really from it. |
+
+## Writing one
+
+See the house rules in `CLAUDE.md`. In short: plain English first, technical detail
+last, every claim true of the code as it actually stands, and every snippet actually
+run before it goes in.
