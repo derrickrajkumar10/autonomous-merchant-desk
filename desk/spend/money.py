@@ -88,6 +88,27 @@ class Money:
         self._same_currency(other)
         return Money(amount=self.amount - other.amount, currency=self.currency)
 
+    def __mul__(self, count: int) -> Money:
+        """This amount, that many times over -- a unit price against a quantity.
+
+        The factor is a **whole count and nothing else**. ``bool`` is an ``int`` in
+        Python and is refused too, because ``price * True`` is never what anybody
+        meant. A ``float`` or a ``Decimal`` factor would be a *rate* rather than a
+        count -- a discount, a margin floor, a tax -- and every one of those needs a
+        rounding decision that somebody has to make out loud, at the place they make
+        it. Making it here, silently and once, is how a rounding rule ends up applied
+        to prices nobody chose it for.
+        """
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise TypeError(
+                f"money multiplies by a whole count of things, not by a "
+                f"{type(count).__name__}; a rate is a rounding decision and does not "
+                f"belong in this operator"
+            )
+        if count < 0:
+            raise ValueError(f"{count} is negative, and nothing here spends backwards")
+        return Money(amount=self.amount * count, currency=self.currency)
+
     def __le__(self, other: Money) -> bool:
         self._same_currency(other)
         return self.amount <= other.amount

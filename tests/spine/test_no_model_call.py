@@ -38,6 +38,16 @@ from world.wallet import PrincipalKeypair
 #: The packages checks 1 to 4 are made of, plus the trail they all write to.
 SPINE = ("audit", "identity", "mandate", "spend", "freshness", "spine")
 
+#: Packages under ``desk/`` that are deliberately *not* part of checks 1 to 4, each with
+#: the reason it is out. Being on this list is not permission to call a model -- it means
+#: this file makes no claim either way, and the claim CONTEXT.md section 5 makes is about
+#: the spine.
+#:
+#: - ``catalogue`` -- costs, prices and margin arithmetic (ticket 07). It runs *after*
+#:   the spine has finished, on a request the four checks already accepted, and it
+#:   decides what a deal is worth rather than whether it is allowed.
+NOT_THE_SPINE = ("catalogue",)
+
 #: Found through the installed package rather than through the working directory, so
 #: that this reads the ``desk`` the tests actually import.
 DESK = pathlib.Path(desk.__file__).parent
@@ -105,6 +115,33 @@ def test_no_module_in_the_spine_imports_anything_that_could_call_a_model() -> No
     )
 
 
+def test_no_module_in_the_spine_reaches_into_a_package_outside_it() -> None:
+    """The hole ``PERMITTED`` cannot see, because ``desk`` is on it.
+
+    The test above compares *top-level* import roots, so ``from desk.catalogue import
+    Product`` inside a check reads as the root ``desk`` and passes. That is fine while
+    every package under ``desk/`` is deterministic, and it stops being fine the moment
+    one is not: check 5 will live under ``desk/`` too, and a spine module importing it
+    would be the exact thing this file exists to prevent, waved through by a root name.
+
+    So the spine's reach into its own project is checked at the *package* level.
+    Relative imports are resolved rather than skipped, since ``from ..inspector import
+    ...`` is the same reach spelled differently.
+    """
+    outside = {
+        f"{module.relative_to(DESK)}: desk.{package}"
+        for module in _spine_modules()
+        for package in _desk_packages_imported(module)
+        if package not in SPINE
+    }
+
+    assert not outside, (
+        f"a module in checks 1 to 4 imported from a package outside the spine: "
+        f"{sorted(outside)}. Everything the spine depends on has to be deterministic, "
+        f"and a package on NOT_THE_SPINE carries no such promise."
+    )
+
+
 def test_running_a_whole_request_through_the_spine_loads_no_model_sdk(
     spine: TrustSpine,
     wallet: PrincipalKeypair,
@@ -129,13 +166,16 @@ def test_the_spine_packages_are_the_ones_this_file_thinks_they_are() -> None:
     """A guard on the guard: a new package under ``desk/`` is either in ``SPINE`` or not.
 
     Without this, adding ``desk/inspector/`` and forgetting to think about it would leave
-    the two tests above quietly passing over a smaller and smaller part of the Desk.
+    the two tests above quietly passing over a smaller and smaller part of the Desk. So
+    a new package fails this test until somebody has said, in writing, which side of the
+    spine it is on.
     """
     packages = {path.name for path in DESK.iterdir() if path.is_dir()}
 
-    assert packages - {"__pycache__"} == set(SPINE), (
+    assert packages - {"__pycache__"} == set(SPINE) | set(NOT_THE_SPINE), (
         "desk/ has gained or lost a package. If it is part of checks 1 to 4, add it to "
-        "SPINE; if it is check 5 or later, leave it out -- and say which in this test."
+        "SPINE; if it is not, add it to NOT_THE_SPINE with the reason -- and either way "
+        "say which in this test."
     )
 
 
@@ -147,10 +187,37 @@ def _spine_modules() -> list[pathlib.Path]:
 
 def _imported_roots(module: pathlib.Path) -> set[str]:
     """The top-level name of everything this module imports, however it imports it."""
-    roots: set[str] = set()
+    return {name.split(".")[0] for name in _imported_names(module)}
+
+
+def _desk_packages_imported(module: pathlib.Path) -> set[str]:
+    """The packages under ``desk/`` this module reaches into, ``desk.spend`` as ``spend``."""
+    return {
+        name.split(".")[1]
+        for name in _imported_names(module)
+        if name.split(".")[0] == "desk" and len(name.split(".")) > 1
+    }
+
+
+def _imported_names(module: pathlib.Path) -> set[str]:
+    """Every dotted name this module imports, with relative imports resolved.
+
+    A relative import is the same reach as an absolute one and has to be read as one,
+    so ``from ..catalogue import Product`` in ``desk/spend/check.py`` comes back as
+    ``desk.catalogue`` rather than being skipped for having no module root.
+    """
+    package = (DESK.parent / module.relative_to(DESK.parent)).parent.relative_to(DESK.parent)
+    parts = ["desk", *package.parts[1:]]
+
+    names: set[str] = set()
     for node in ast.walk(ast.parse(module.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
-            roots.update(alias.name.split(".")[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            roots.add(node.module.split(".")[0])
-    return roots
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                if node.module:
+                    names.add(node.module)
+            else:
+                base = parts[: len(parts) - node.level + 1]
+                names.add(".".join([*base, *([node.module] if node.module else [])]))
+    return names

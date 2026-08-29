@@ -66,3 +66,34 @@ def test_an_amount_that_is_not_finite_is_not_money() -> None:
 def test_money_reads_as_an_amount_and_a_currency() -> None:
     """What every balance in the audit trail is rendered by."""
     assert str(Money.of("1250.00", "INR")) == "1250.00 INR"
+
+
+def test_money_times_a_count_is_money() -> None:
+    """A unit price and a quantity, which is how every line on a deal is priced."""
+    assert Money.of("899.00", "INR") * 3 == Money.of("2697.00", "INR")
+
+
+def test_multiplying_by_a_count_stays_exact() -> None:
+    """Three lots of ``0.1`` is ``0.3``, which a float would not manage."""
+    assert Money.of("0.1", "INR") * 3 == Money.of("0.3", "INR")
+
+
+def test_money_times_a_float_is_refused() -> None:
+    """The same rule as the constructor, at the other end of the arithmetic."""
+    with pytest.raises(TypeError, match="whole count"):
+        Money.of("899.00", "INR") * 1.5  # type: ignore[operator]
+
+
+def test_money_times_a_decimal_is_refused() -> None:
+    """A ``Decimal`` factor is not a quantity; it is a rate, and rates round.
+
+    Where one is genuinely wanted -- a discount, a margin floor -- the rounding is a
+    decision somebody has to make explicitly, so it does not happen here.
+    """
+    with pytest.raises(TypeError, match="whole count"):
+        Money.of("899.00", "INR") * Decimal("0.5")  # type: ignore[operator]
+
+
+def test_money_times_a_negative_count_is_refused() -> None:
+    with pytest.raises(ValueError, match="nothing here spends backwards"):
+        Money.of("899.00", "INR") * -1
