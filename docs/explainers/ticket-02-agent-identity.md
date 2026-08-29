@@ -10,7 +10,7 @@ more. Stop wherever you have what you need — the code is at the end, not the s
 |:---|:---|
 | **Issue** | [#19](https://github.com/derrickrajkumar10/autonomous-merchant-desk/issues/19), under spec [#3](https://github.com/derrickrajkumar10/autonomous-merchant-desk/issues/3) |
 | **Branch** | `ticket-02-agent-identity` |
-| **Builds on** | Ticket 01, the audit trail |
+| **Builds on** | [Ticket 01 — the audit trail](ticket-01-audit-trail.md) |
 | **Contract doc** | [docs/agent-identity.md](../agent-identity.md) — the terse version, for someone writing code against it |
 
 ---
@@ -192,9 +192,9 @@ asserts that field list so nobody can quietly add one.
 
 ### 3.6 Everything gets written down
 
-Ticket 01 built the audit trail: an append-only, hash-chained table where every decision
-the Desk makes is recorded with its reasoning and its evidence. Nothing is ever edited
-or deleted; a correction is a new entry.
+[Ticket 01](ticket-01-audit-trail.md) built the audit trail: an append-only,
+hash-chained table where every decision the Desk makes is recorded with its reasoning and
+its evidence. Nothing is ever edited or deleted; a correction is a new entry.
 
 This ticket writes to it at every outcome:
 

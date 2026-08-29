@@ -10,7 +10,7 @@ the *what*, for someone already writing code against it.
 
 | Ticket | Explainer | In one line |
 |:---|:---|:---|
-| 01 | *not yet written* | The append-only, hash-chained record every decision is written to. |
+| 01 | [The audit trail](ticket-01-audit-trail.md) | A permanent record of every decision that nobody, including us, can quietly change. |
 | 02 | [Agent registration and identity](ticket-02-agent-identity.md) | An agent introduces itself once, then proves every message is really from it. |
 
 ## Writing one
