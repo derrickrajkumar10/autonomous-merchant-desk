@@ -275,6 +275,81 @@ def test_a_payment_due_inside_its_window_is_authorised(
     assert outcome.passed
 
 
+def test_a_window_that_has_closed_refuses_a_payment_dated_inside_it(
+    spend_check: SpendAuthorityCheck,
+    mandate_check: MandateCheck,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """The window is compared to the calendar, not only to the mandate's own date.
+
+    Both dates the mandate carries agree with each other: it names 1 April, and the
+    window it authorises payment in ran through April. Both are in the past. Compared
+    only to each other the answer is *yes* and stays *yes* for ever, so a mandate with
+    no ``exp`` -- which AP2 permits -- would be spendable years after the window shut.
+    """
+    presented = present(
+        mandate_check,
+        wallet,
+        agent,
+        identity,
+        payment_constraints=[
+            budget(),
+            execution_window(not_before="2026-04-01T00:00:00Z", not_after="2026-04-30T00:00:00Z"),
+        ],
+        execution_date="2026-04-01T09:00:00Z",
+    )
+
+    outcome = spend_check.evaluate(
+        a_request("750.00"),
+        presented_by=identity,
+        checkout=presented.checkout,
+        payment=presented.payment,
+    )
+
+    assert not outcome.passed
+    assert outcome.reason_code is ReasonCode.OUTSIDE_VALIDITY_WINDOW
+    assert "not a date on the calendar" in outcome.entry.payload["reasoning"]
+    assert outcome.entry.payload["evidence"]["executes_at"].startswith("2026-04-01")
+    assert outcome.entry.payload["evidence"]["evaluated_at"] > "2026-04-30"
+
+
+def test_a_mandate_that_does_not_agree_with_itself_about_dates_is_refused(
+    spend_check: SpendAuthorityCheck,
+    mandate_check: MandateCheck,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """The other half of the pair: the date named sits outside the window named.
+
+    Told apart from the closed window by its sentence rather than its reason code, the
+    way every other refusal in this check is.
+    """
+    presented = present(
+        mandate_check,
+        wallet,
+        agent,
+        identity,
+        payment_constraints=[
+            budget(),
+            execution_window(not_before="2099-01-01T00:00:00Z"),
+        ],
+        execution_date="2026-09-01T09:00:00Z",
+    )
+
+    outcome = spend_check.evaluate(
+        a_request("750.00"),
+        presented_by=identity,
+        checkout=presented.checkout,
+        payment=presented.payment,
+    )
+
+    assert outcome.reason_code is ReasonCode.OUTSIDE_VALIDITY_WINDOW
+    assert "does not agree with itself" in outcome.entry.payload["reasoning"]
+
+
 def test_a_payment_dated_after_its_window_is_refused(
     spend_check: SpendAuthorityCheck,
     mandate_check: MandateCheck,

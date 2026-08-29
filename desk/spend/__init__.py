@@ -33,7 +33,7 @@ the mandate's digest, holding the accumulated total AP2 asks the verifier to tra
 Nothing is drawn down by evaluating. When a deal closes, the negotiation records the
 spend in the same transaction as the entry that explains it:
 
-    accumulator.record_spend(payment_outcome.digest, budget=budget, amount=amount, conn=conn)
+    accumulator.record_spend(payment_outcome, amount=amount, conn=conn)
 """
 
 from desk.spend.accumulator import (

@@ -21,8 +21,9 @@ the Desk can answer from memory run before the one that reads state:
 4. **Is the request in the currency that ceiling is written in?** The Desk holds no
    exchange rate, and converting would manufacture authority nobody gave.
 5. **Is the payment inside its execution window?** ``payment.execution_date``'s
-   ``not_before`` and ``not_after``. Distinct from the ``exp`` check 2 already ran:
-   ``exp`` cannot express *authorised, but not until Monday*.
+   ``not_before`` and ``not_after``, against two instants: the date the mandate names
+   for itself, and now. Distinct from the ``exp`` check 2 already ran, which cannot
+   express *authorised, but not until Monday*.
 6. **Is there enough left?** AP2's own rule -- the requested amount plus the
    accumulated total, at or under ``max``.
 
@@ -214,16 +215,34 @@ class SpendAuthorityCheck:
         now = datetime.now(UTC)
         executes_at = payment_mandate.execution_date or now
         window = payment_mandate.execution_window
-        if window is not None and not window.contains(executes_at):
-            return self._refuse(
-                presented_by=presented_by,
-                reason=ReasonCode.OUTSIDE_VALIDITY_WINDOW,
-                reasoning=(
-                    "the payment would execute outside the window the principal authorised it for"
-                ),
-                request=request,
-                evidence=_window_evidence(payment_mandate, executes_at),
-            )
+        if window is not None:
+            # Two instants, and the second is the one that matters. A mandate naming its
+            # own execution_date would otherwise be checked only against dates written on
+            # itself -- "is 1 April inside 1 to 30 April" -- which is a question about
+            # whether the mandate agrees with itself, and has the same answer for ever. A
+            # window compared to nothing but that is a window that never closes.
+            if not window.contains(executes_at):
+                return self._refuse(
+                    presented_by=presented_by,
+                    reason=ReasonCode.OUTSIDE_VALIDITY_WINDOW,
+                    reasoning=(
+                        "the mandate names an execution date outside the window it "
+                        "authorises payment in, so it does not agree with itself"
+                    ),
+                    request=request,
+                    evidence=_window_evidence(payment_mandate, executes_at, now),
+                )
+            if not window.contains(now):
+                return self._refuse(
+                    presented_by=presented_by,
+                    reason=ReasonCode.OUTSIDE_VALIDITY_WINDOW,
+                    reasoning=(
+                        "the window the principal authorised this payment in is not open; "
+                        "a date written on the mandate is not a date on the calendar"
+                    ),
+                    request=request,
+                    evidence=_window_evidence(payment_mandate, executes_at, now),
+                )
 
         ledger = self._accumulator.spent_against(payment)
         if not ledger.covers(request.amount):
@@ -253,7 +272,7 @@ class SpendAuthorityCheck:
                 ),
                 "evidence": _requested(request)
                 | _ledger_evidence(ledger)
-                | _window_evidence(payment_mandate, executes_at)
+                | _window_evidence(payment_mandate, executes_at, now)
                 | {"would_leave": str(remaining)},
                 # Authorised, not yet spent. Nothing is drawn down until a deal closes,
                 # and this request has not been checked for replay or inspected yet.
@@ -324,15 +343,20 @@ def _ledger_evidence(ledger: MandateSpend) -> dict[str, Any]:
     }
 
 
-def _window_evidence(mandate: OpenPaymentMandate, executes_at: datetime) -> dict[str, Any]:
-    """The window the mandate set and the instant it was compared against.
+def _window_evidence(
+    mandate: OpenPaymentMandate, executes_at: datetime, now: datetime
+) -> dict[str, Any]:
+    """The window the mandate set and the two instants it was compared against.
 
     ``executes_at`` is the mandate's own ``execution_date`` where it set one, and
-    otherwise now -- AP2's "when absent indicates immediate execution".
+    otherwise now -- AP2's "when absent indicates immediate execution". ``evaluated_at``
+    is when the Desk was asked. They are recorded separately because they answer two
+    different questions, and a refusal is unreadable without knowing which one failed.
     """
     window = mandate.execution_window
     return {
         "executes_at": executes_at.isoformat(),
+        "evaluated_at": now.isoformat(),
         "not_before": (
             None if window is None or window.not_before is None else window.not_before.isoformat()
         ),

@@ -118,11 +118,17 @@ def read_open_checkout_mandate(claims: Mapping[str, Any]) -> OpenCheckoutMandate
         issued_at=read.issued_at,
         expires_at=read.expires_at,
     )
-    # Force the item ids now rather than when check 3 asks for them. A malformed
+    # Force both reads now rather than when check 3 asks for them. A malformed
     # requirement is a malformed mandate, and it belongs with every other structural
     # refusal in check 2 -- surfacing later would put "not authorised" in the trail
     # for a mandate that authorises nothing readable, which is a different sentence.
     mandate.authorised_item_ids()
+    # The second read is for its refusal and not its value. ``constraint`` refuses a
+    # mandate carrying two of one type, and check 3 asks this question of every
+    # presentation -- so without this the refusal happened *there*, as an exception
+    # nothing caught, leaving a decision the trail has no record of. Two merchant lists
+    # is a malformed mandate like any other, and this is where those are refused.
+    mandate.constraint(ALLOWED_MERCHANTS_CONSTRAINT)
     return mandate
 
 

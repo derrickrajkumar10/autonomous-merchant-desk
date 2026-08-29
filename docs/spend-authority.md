@@ -153,7 +153,7 @@ state, which is the only reason the order is what it is.
 | 2 | Does the Checkout Mandate restrict its merchants? | `category_not_authorised` |
 | 3 | Is the item among the authorised `acceptable_items`? | `category_not_authorised` |
 | 4 | Is there a ceiling, and is the request in its currency? | `exceeds_remaining_balance` / `category_not_authorised` |
-| 5 | Would the payment execute inside `not_before`…`not_after`? | `outside_validity_window` |
+| 5 | Is the payment inside `not_before`…`not_after` — both the date it names and now? | `outside_validity_window` |
 | 6 | Is the amount plus the accumulated total at or under `max`? | `exceeds_remaining_balance` |
 
 Question 2 is a **refusal to guess**. `checkout.allowed_merchants` is a constraint AP2
@@ -179,14 +179,22 @@ because the Desk holds no exchange rate, and inventing one would manufacture aut
 the principal never gave.
 
 Structural problems — a malformed budget, a window that ends before it begins, two
-ceilings in one mandate — never reach check 3. They are refused in check 2 under
-`mandate_signature_invalid`, where every other structural refusal already lives.
+ceilings in one mandate, two merchant lists in one mandate — never reach check 3. They
+are refused in check 2 under `mandate_signature_invalid`, where every other structural
+refusal already lives.
 
-Question 4 is genuinely distinct from check 2's `exp`. `exp` says when authority
+Question 5 is genuinely distinct from check 2's `exp`. `exp` says when authority
 *lapses*; `not_before` says when it *begins*, and no expiry can express "authorised,
-but not until Monday". The instant compared is the Payment Mandate's own
-`execution_date`, or now where it sets none — AP2's "when absent indicates immediate
-execution".
+but not until Monday".
+
+**It compares two instants, and the second is the one that bites.** The first is the
+Payment Mandate's own `execution_date`, or now where it sets none — AP2's "when absent
+indicates immediate execution". Against the window, that asks whether the mandate agrees
+with itself, and the answer never changes: a mandate naming 1 April inside a window
+running to 30 April is self-consistent in August too. So now is compared as well.
+Without it, a window is only ever checked against dates written on the same piece of
+paper, and a mandate with no `exp` — which AP2 permits — stays spendable indefinitely.
+Both land on `outside_validity_window` and are told apart by the sentence in the trail.
 
 ## The accumulator
 
@@ -286,6 +294,7 @@ A pass:
               "already_spent": "0 INR",
               "remaining": "2000.0 INR",
               "executes_at": "2026-08-29T12:05:38.847625+00:00",
+              "evaluated_at": "2026-08-29T12:05:38.847625+00:00",
               "not_before": null,
               "not_after": "2027-01-01T00:00:00+00:00",
               "would_leave": "1250.00 INR"},

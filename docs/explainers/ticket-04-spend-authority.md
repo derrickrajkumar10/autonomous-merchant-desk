@@ -104,7 +104,7 @@ was authorised*.
 
 ## 5. What check 3 actually does
 
-Five questions. All of them deterministic — no model decides any of them, which is a
+Six questions. All of them deterministic — no model decides any of them, which is a
 rule the whole project runs on and which AP2 states too.
 
 | # | Question | Refusal |
@@ -113,7 +113,7 @@ rule the whole project runs on and which AP2 states too.
 | 2 | Is there a constraint we cannot evaluate? | `category_not_authorised` |
 | 3 | Is this the thing that was authorised? | `category_not_authorised` |
 | 4 | Is there a ceiling, and is the request in its currency? | `exceeds_remaining_balance` / `category_not_authorised` |
-| 5 | Would the payment happen inside its window? | `outside_validity_window` |
+| 5 | Is the payment inside its window — both the date it names and today? | `outside_validity_window` |
 | 6 | Is there enough left? | `exceeds_remaining_balance` |
 
 The order is not decoration. The first five are answered from memory; only the sixth
@@ -134,11 +134,21 @@ thing wearing a different coat. The cost is real — a perfectly valid mandate i
 away until a later ticket can read it — and it is the right way round, because the other
 way round spends someone's money at the wrong shop.
 
-Question 4 deserves a note, because at first glance check 2 already did it. Check 2 reads
-the mandate's `exp` — when the authorisation *lapses*. Question 4 reads `not_before`,
+Question 5 deserves a note, because at first glance check 2 already did it. Check 2 reads
+the mandate's `exp` — when the authorisation *lapses*. Question 5 reads `not_before`,
 which is when it *begins*. No expiry date can express *authorised, but not until Monday*,
 and a mandate signed on Friday for a payment due next month is an ordinary thing for a
 person to want.
+
+It compares the window to **two** instants, and the second was missing when this ticket
+first shipped. The obvious one is the date the mandate names for itself. The trouble is
+that both of those are written on the same piece of paper, so the comparison asks only
+whether the mandate agrees with itself — and that answer never changes. A mandate naming
+1 April, inside a window running to 30 April, is just as self-consistent in August. Since
+`exp` is optional in AP2, such a mandate could carry no other bound at all and stay
+spendable indefinitely. So today's date is compared as well. Found in review after
+ticket 05 and fixed there; the two cases share `outside_validity_window` and are told
+apart by their sentence in the trail.
 
 ## 6. Two notes, not one — and how we nearly got it wrong
 

@@ -151,6 +151,38 @@ def test_a_mandate_authorising_nothing_is_refused(
     assert outcome.reason_code is ReasonCode.MANDATE_SIGNATURE_INVALID
 
 
+def test_a_mandate_carrying_two_of_one_constraint_is_refused_here(
+    mandate_check: MandateCheck,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """A structural refusal that used to happen in check 3, as an exception nobody caught.
+
+    ``constraint`` will not choose between two constraints of one type, and check 3 asks
+    that question of ``checkout.allowed_merchants`` on every presentation. Refused there,
+    it raised out of ``evaluate`` and left a decision the trail had no record of -- from
+    input a buyer agent chooses. Two merchant lists is a malformed mandate like any
+    other, and this is where those are refused.
+    """
+    outcome = mandate_check.verify(
+        a_mandate(
+            wallet,
+            agent,
+            constraints=[
+                line_items(),
+                {"type": "checkout.allowed_merchants", "allowed": [{"id": "stitchai"}]},
+                {"type": "checkout.allowed_merchants", "allowed": [{"id": "somebody-else"}]},
+            ],
+        ),
+        presented_by=identity,
+    )
+
+    assert not outcome.passed
+    assert outcome.reason_code is ReasonCode.MANDATE_SIGNATURE_INVALID
+    assert "will not choose between them" in outcome.entry.payload["reasoning"]
+
+
 def test_a_mandate_without_a_key_binding_is_refused(
     mandate_check: MandateCheck,
     wallet: PrincipalKeypair,
