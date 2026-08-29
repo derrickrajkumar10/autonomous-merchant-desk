@@ -155,7 +155,7 @@ as the ones that succeeded.
 - **Not authorisation.** Check 2 verifies the principal's mandate ([the contract is
   here](mandates.md)), check 3 the spend against it.
 - **Not freshness.** A signed request replayed a second time verifies here exactly as
-  it did the first. Check 4 owns that.
+  it did the first. Check 4 owns that — [docs/freshness.md](freshness.md).
 - **Not a session.** Requests are individually signed; there is nothing to log into and
   nothing to steal but the key itself.
 - **Not key rotation or revocation.** Real concerns, deliberately not this build.

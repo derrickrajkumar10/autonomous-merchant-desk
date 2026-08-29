@@ -57,8 +57,15 @@ machinery would therefore need an EC agent key.
 That trade was made deliberately. ADR-0011 makes an agent's identity its key's thumbprint, so
 giving agents a second key for mandate presentation would mean an agent with two identities,
 which is the confusion the whole identity subsystem exists to prevent. Interoperability that
-costs the identity model is not worth having. The boundary is ticket 05's to face when it
-builds the key-binding hop, and it is written down here rather than discovered there.
+costs the identity model is not worth having.
+
+**Ticket 05 met that boundary and did not move it.** The key-binding JWT check 4 reads proves
+possession of whichever key the mandate's `cnf` endorses, so ours is signed **EdDSA** while AP2's
+OpenID4VP request advertises `"kb-jwt_alg_values": ["ES256"]`. That is this same exception seen
+from the other side rather than a third one: the issuer signs ES256 so a stranger's library can
+read the mandate, and the holder signs Ed25519 because that is the key the holder has. What it
+costs is that the SDK's own `kb_sd_jwt` helper cannot build our hop — but nor could a verifier
+restricted to ES256 have consumed our `cnf`, so the interoperability was already spent.
 
 See [the AP2 research note](../research/ap2-mandate-model.md) for the field-level citations.
 

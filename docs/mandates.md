@@ -185,14 +185,16 @@ It comes from the repository rather than PyPI, where `ap2` is a third party's mi
 the superseded v0.1 model under a different licence. Without it those tests skip and say
 so.
 
-Two boundaries to know about, both of which check 4 will meet:
+Two boundaries to know about:
 
 - The Desk binds mandates to the agent's **Ed25519** key, which the SDK carries intact on
   a root mandate but whose `JsonWebKey` model would reject on a delegation hop. ADR-0002
-  records why that trade was taken.
-- A presentation carrying a trailing key-binding JWT, or an AP2 delegation chain joined
-  by `~~`, is recognised and refused with a sentence saying the Desk reads the root
-  mandate only. Reading either means reading a nonce and an audience, which is check 4.
+  records why that trade was taken. Check 4's key-binding JWT is Ed25519 for the same
+  reason, and [docs/freshness.md](freshness.md) states what that costs.
+- An AP2 delegation chain joined by `~~` is recognised and refused with a sentence saying
+  the Desk reads a root mandate and the one key-binding hop presenting it. A *trailing*
+  key-binding JWT is read — not here, but by check 4, which `split_presentation` sets
+  aside for it.
 
 ---
 
@@ -202,8 +204,9 @@ Two boundaries to know about, both of which check 4 will meet:
   the `payment.budget` ceiling drawn down across deals, is check 3 —
   [docs/spend-authority.md](spend-authority.md).
 - **Not freshness.** A mandate presented twice passes here twice. Check 4 owns the nonce
-  and the window, which live on the presentation hop rather than on the mandate.
+  and the window, which live on the presentation hop rather than on the mandate —
+  [docs/freshness.md](freshness.md).
 - **Not the closed mandate.** The specific negotiated deal is a later ticket.
-- **A known gap until check 4 lands.** `exp` is optional in AP2, so a mandate without one
-  never expires by this test. What is meant to bound it is the freshness window on the
-  presentation, which does not exist yet.
+- **Not a bound on a mandate with no `exp`.** `exp` is optional in AP2, so a mandate
+  without one never expires by this test. What bounds it is the freshness window on the
+  presentation, which is check 4's.

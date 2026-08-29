@@ -20,6 +20,8 @@ from desk.mandate import (
     MandateNotVerified,
     digest_of,
     read_mandate_header,
+    sd_hash_of,
+    split_presentation,
     verify_presentation,
     verify_sd_jwt,
 )
@@ -241,22 +243,73 @@ def test_something_that_is_not_an_sd_jwt_is_refused() -> None:
         verify_sd_jwt("~disclosure~", key)
 
 
-def test_a_presentation_the_desk_does_not_read_yet_says_so(
+def test_a_key_binding_hop_is_set_aside_rather_than_read(
     wallet: PrincipalKeypair, agent: AgentKeypair
 ) -> None:
-    """A conformant AP2 presentation the Desk cannot follow yet is told which, and why.
+    """Check 2 reads the issuer's signature; the hop after it is check 4's to read.
 
-    Both shapes end in a JWT rather than a disclosure. Left unrecognised they were
-    refused for "not readable" -- true of a disclosure, misleading about a mandate that
-    is perfectly well formed and simply one ticket ahead of us.
+    The hop is not a disclosure and must not be treated as one -- material the signed
+    claims make no room for is refused, and refusing a conformant presentation for
+    carrying its proof of possession would make key binding unusable. It is also not
+    verified here: this layer has no idea whose key it should be signed by.
     """
     mandate = _mandate(wallet, agent)
-    key_bound = mandate + "eyJhbGciOiJFUzI1NiJ9.eyJub25jZSI6Ing"
+    key_bound = mandate + "eyJhbGciOiJFZERTQSJ9.eyJub25jZSI6Ing.c2ln"
 
-    with pytest.raises(MandateNotVerified, match="key-binding JWT"):
-        verify_sd_jwt(key_bound, wallet.public_key)
+    assert verify_sd_jwt(key_bound, wallet.public_key) == verify_sd_jwt(mandate, wallet.public_key)
+
+
+def test_the_digest_naming_a_mandate_does_not_move_when_a_hop_is_attached(
+    wallet: PrincipalKeypair, agent: AgentKeypair
+) -> None:
+    """The two digests answer two questions, and only one of them is per-presentation.
+
+    ``digest_of`` names the mandate, which is what AP2 pairs by and what the spend
+    accumulator is keyed by. If it moved when a hop was appended, an agent would get a
+    fresh ceiling for every presentation -- so it is taken over the issuer JWS, which a
+    hop does not touch. ``sd_hash_of`` is the one that must move, because binding a hop
+    to the exact bytes it was made over is its whole job.
+    """
+    mandate = _mandate(wallet, agent)
+    key_bound = mandate + "eyJhbGciOiJFZERTQSJ9.eyJub25jZSI6Ing.c2ln"
+
+    assert digest_of(key_bound) == digest_of(mandate)
+    assert sd_hash_of(key_bound) == sd_hash_of(mandate)
+    assert sd_hash_of(mandate) != digest_of(mandate)
+
+
+def test_a_delegation_chain_says_which_shape_the_desk_does_not_read(
+    wallet: PrincipalKeypair, agent: AgentKeypair
+) -> None:
+    """A conformant AP2 chain is told what the Desk cannot follow, rather than mis-parsed.
+
+    Left unrecognised it was refused for "not readable" -- true of a disclosure, and
+    misleading about a presentation that is perfectly well formed.
+    """
+    mandate = _mandate(wallet, agent)
+
     with pytest.raises(MandateNotVerified, match="delegation chain"):
         verify_sd_jwt(f"{mandate}~{mandate}", wallet.public_key)
+
+
+def test_a_presentation_split_where_rfc_9901_splits_one(
+    wallet: PrincipalKeypair, agent: AgentKeypair
+) -> None:
+    """Ending in the separator or not is the whole rule, and it is the whole rule twice.
+
+    Without a hop the trailing segment is empty and there is nothing to mistake for one.
+    With a hop, everything up to and including the last separator is what ``sd_hash``
+    covers -- so the split has to put the separator on the SD-JWT side of the cut.
+    """
+    mandate = _mandate(wallet, agent)
+
+    plain = split_presentation(mandate)
+    assert plain.sd_jwt == mandate
+    assert plain.key_binding_jwt is None
+
+    bound = split_presentation(mandate + "a.b.c")
+    assert bound.sd_jwt == mandate
+    assert bound.key_binding_jwt == "a.b.c"
 
 
 def test_the_signer_hint_is_read_without_being_believed(

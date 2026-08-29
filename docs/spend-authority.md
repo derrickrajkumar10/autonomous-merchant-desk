@@ -344,7 +344,8 @@ our side regardless.
   produces. Check 3 asks the narrower question the PRD asks: is this the *category*
   that was authorised.
 - **Not freshness.** A request that passes here passes again if replayed. Check 4 owns
-  the nonce and the window on the presentation hop.
+  the nonce and the window on the presentation hop —
+  [docs/freshness.md](freshness.md).
 - **Not the charge.** Nothing here moves money or talks to a payment rail.
 - **Not the merchant.** `checkout.allowed_merchants` is read and carried but **not
   evaluated**, so a mandate scoped to a different merchant passes check 3 here.

@@ -9,9 +9,16 @@ because reading a mandate at all means resolving digests back into claims.
 
     <issuer JWS>~<disclosure>~<disclosure>~
 
-A presentation may also carry a trailing key-binding JWT, and AP2 may join several hops
-of a delegation chain with ``~~``. Both are recognised here and refused with a sentence
-saying so: reading them means reading a nonce and an audience, which is check 4.
+A presentation may also carry a trailing **key-binding JWT**: a second signature, made
+by the agent the mandate names, over this exact presentation. It is recognised and set
+aside here rather than read, because what it carries -- a nonce, an audience and a
+timestamp of its own -- is check 4's question rather than the issuer's signature.
+``split_presentation`` is where the two are told apart, and it is the one place that
+knows a hop is not a disclosure.
+
+AP2 may also join several hops of a delegation chain with ``~~``. The Desk reads a root
+mandate and the one hop presenting it, so a chain is recognised in order to be refused
+with a sentence saying so.
 
 This module is the verifier half and nothing else. It checks the issuer's signature,
 resolves the disclosures the holder chose to send back into the claims they came
@@ -273,32 +280,82 @@ def signed_digest_of(mandate: str, *, algorithm: str = DEFAULT_SD_ALG) -> Mandat
     return MandateDigest(algorithm=algorithm, value=_digest(signing_input, _HASHES[algorithm]))
 
 
-def _issuer_jws(mandate: str) -> str:
-    """The signed part: everything before the first separator."""
+@dataclass(frozen=True)
+class SplitPresentation:
+    """One presentation, cut where RFC 9901 cuts one.
+
+    ``sd_jwt`` is the issuer JWS, its disclosures and the separator that ends them --
+    exactly the characters a key-binding JWT's ``sd_hash`` claim is taken over.
+    ``key_binding_jwt`` is the proof of possession after it, or ``None`` when the
+    holder attached none.
+    """
+
+    sd_jwt: str
+    key_binding_jwt: str | None
+
+
+def split_presentation(mandate: str) -> SplitPresentation:
+    """Tell a key-binding hop from a disclosure, by RFC 9901's own rule.
+
+    The rule is positional, which is what makes it safe to apply before anything has
+    been verified: a presentation carrying no key binding **ends in the separator**, so
+    a non-empty trailing segment is a hop and never a disclosure.
+
+    Both ways of getting this wrong are holes rather than inconveniences. Read as a
+    disclosure, a hop is refused as material the signed claims make no room for, and a
+    conformant presentation never gets past check 2. Read as a hop, a disclosure is
+    quietly dropped -- and dropping one leaves a mandate that still verifies and
+    authorises strictly more, which is the exact hole ``_resolve`` exists to close.
+    """
     if not isinstance(mandate, str) or not mandate.strip():
         raise MandateNotVerified("no mandate was presented")
     if SEPARATOR not in mandate:
         raise MandateNotVerified(
             "the mandate carries no disclosure separator, so it is not an SD-JWT"
         )
-    issuer_jws = mandate.split(SEPARATOR, 1)[0]
-    if not issuer_jws:
-        raise MandateNotVerified("the mandate has no issuer JWS before its disclosures")
-
-    # Two shapes RFC 9901 and AP2 both allow, and this ticket deliberately does not read.
-    # Recognised so that a conformant presentation is told what the Desk cannot do yet,
-    # rather than refused for failing to parse a JWT as though it were a disclosure.
+    # A shape AP2 allows and the Desk deliberately does not read. Recognised so that a
+    # conformant chain is told what the Desk cannot do, rather than refused for failing
+    # to parse a JWT as though it were a disclosure.
     if HOP_SEPARATOR in mandate:
         raise MandateNotVerified(
             "the mandate is a delegation chain. The Desk reads the root mandate a "
-            "principal signed; following key-binding hops is check 4's work and is "
-            "not built yet."
+            "principal signed and the one key-binding hop that presents it; following "
+            "further hops is not built."
         )
-    if not mandate.endswith(SEPARATOR):
+    if mandate.endswith(SEPARATOR):
+        return SplitPresentation(sd_jwt=mandate, key_binding_jwt=None)
+    sd_jwt, _, hop = mandate.rpartition(SEPARATOR)
+    return SplitPresentation(sd_jwt=sd_jwt + SEPARATOR, key_binding_jwt=hop)
+
+
+def sd_hash_of(mandate: str, *, algorithm: str = DEFAULT_SD_ALG) -> MandateDigest:
+    """The digest a key-binding JWT's ``sd_hash`` claim has to carry.
+
+    Over the issuer JWS **and** its disclosures as they arrived, which is the opposite
+    choice to ``digest_of`` above and deliberately so. ``digest_of`` names a *mandate*
+    and must not move when the holder reorders its disclosures. This names one
+    *presentation* of that mandate, and binding the hop to the exact bytes it was made
+    over is the entire point: a hop that covered only the signed part could be lifted
+    onto a presentation of the same mandate with different disclosures.
+
+    Taken over the received characters, for the reason ``_digest`` gives -- a hop signed
+    over re-encoded bytes would bind nothing that arrived.
+    """
+    if algorithm not in _HASHES:
         raise MandateNotVerified(
-            "the mandate ends in a key-binding JWT. Reading one -- and the nonce and "
-            "audience it carries -- is check 4's work and is not built yet."
+            f"the Desk does not digest presentations under {algorithm!r}; it understands "
+            f"{', '.join(sorted(_HASHES))}"
         )
+    return MandateDigest(
+        algorithm=algorithm, value=_digest(split_presentation(mandate).sd_jwt, _HASHES[algorithm])
+    )
+
+
+def _issuer_jws(mandate: str) -> str:
+    """The signed part: everything before the first separator."""
+    issuer_jws = split_presentation(mandate).sd_jwt.split(SEPARATOR, 1)[0]
+    if not issuer_jws:
+        raise MandateNotVerified("the mandate has no issuer JWS before its disclosures")
     return issuer_jws
 
 
@@ -336,7 +393,7 @@ def _disclosures(mandate: str, hash_alg: Any) -> dict[str, _Disclosure]:
     9901 takes the hash of the base64url string as it arrived, so a disclosure that
     round-trips differently still matches the digest the principal signed.
     """
-    _, _, tail = mandate.partition(SEPARATOR)
+    _, _, tail = split_presentation(mandate).sd_jwt.partition(SEPARATOR)
     segments = [segment for segment in tail.split(SEPARATOR) if segment]
 
     by_digest: dict[str, _Disclosure] = {}

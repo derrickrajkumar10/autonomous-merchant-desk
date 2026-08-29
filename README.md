@@ -83,7 +83,7 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 |:--|:------|:-----|:-------------|
 | **1** | **Identity** — signature verifies against a registered public key | Deterministic | `agent_signature_invalid` |
 | **2** | **Mandate validity** — principal's signature verifies, not expired, presenting agent's key matches the mandate's `cnf` binding | Deterministic | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
-| **3** | **Spend authority** — inside remaining balance, category authorised, inside the validity window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised` |
+| **3** | **Spend authority** — inside remaining balance, category authorised, inside the validity window | Deterministic | `exceeds_remaining_balance`, `category_not_authorised`, `outside_validity_window` |
 | **4** | **Replay & freshness** — nonce unseen, timestamp inside window | Deterministic | `nonce_replayed`, `request_stale` |
 | **5** | **Content & behaviour** — is this information, or an instruction aimed at the desk? Does this agent's pattern look like probing or trust farming? | Judgment | `prompt_injection_detected`, `escalation_pattern_detected` |
 
@@ -92,7 +92,8 @@ Five checks, in order. Cheap and certain first, expensive and probabilistic last
 Check 1 and the registry behind it are documented in [docs/agent-identity.md](docs/agent-identity.md);
 check 2 and the AP2 mandate library in [docs/mandates.md](docs/mandates.md); check 3, the
 `payment.budget` ceiling and the accumulator that draws it down in
-[docs/spend-authority.md](docs/spend-authority.md). Both directions of AP2 conformance — a mandate
+[docs/spend-authority.md](docs/spend-authority.md); check 4, the key-binding hop and the
+nonce store behind it in [docs/freshness.md](docs/freshness.md). Both directions of AP2 conformance — a mandate
 Google's SDK produced verifying in ours, and one of ours verifying in theirs, for the open Checkout
 and open Payment Mandate alike — are exercised as tests, not asserted in prose.
 

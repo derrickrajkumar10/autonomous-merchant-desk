@@ -29,6 +29,7 @@ from psycopg_pool import ConnectionPool
 
 from desk.audit import AuditTrail
 from desk.audit import install_schema as install_audit_schema
+from desk.freshness import install_schema as install_freshness_schema
 from desk.identity import AgentIdentity, AgentRegistry, PrincipalDirectory
 from desk.identity import install_schema as install_identity_schema
 from desk.mandate import MandateCheck
@@ -80,9 +81,11 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
             conn.execute("DROP TABLE IF EXISTS agent_identity")
             conn.execute("DROP TABLE IF EXISTS principal_key")
             conn.execute("DROP TABLE IF EXISTS mandate_spend")
+            conn.execute("DROP TABLE IF EXISTS seen_nonce")
             install_audit_schema(conn)
             install_identity_schema(conn)
             install_spend_schema(conn)
+            install_freshness_schema(conn)
         yield pool
 
 

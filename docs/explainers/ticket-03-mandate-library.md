@@ -323,8 +323,8 @@ process with a human in the loop.
 **A mandate with no expiry is accepted.** AP2 makes `exp` optional — only RECOMMENDED —
 so refusing one for its absence would refuse a conformant mandate. What bounds such a
 mandate instead is the freshness window on the *presentation*, which is check 4's job.
-Until ticket 05 lands, that is a real gap, and it is better said than left for someone
-to find.
+That was a real gap when this ticket shipped, and it was better said than left for
+someone to find; [ticket 05](ticket-05-replay-and-freshness.md) closed it.
 
 ## 11. The code
 

@@ -131,6 +131,8 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 | **Open mandate** | The forward-looking variant, carrying constraints and the presenting agent's key. Fills the role we used to call an Intent Mandate. | Intent Mandate, Cart Mandate |
 | **Closed mandate** | The variant capturing one specific agreed transaction. | Cart Mandate |
 | **Key binding** | The `cnf` claim carrying the presenting agent's public key, which makes a stolen mandate useless to anyone else. | Agent name, agent ID |
+| **Nonce** | A value used once, carried on the key-binding hop. The Desk refuses to honour the same one from the same agent twice, which is what makes a replayed presentation refusable. | Request id, token |
+| **Freshness window** | How old a key-binding hop may be before the Desk stops honouring it. Configured, deliberately short, and what makes captured traffic decay. | Timeout, TTL |
 | **Principal** | The human whose key signs a mandate. | User, owner, account |
 | **Agent identity** | The agent's own registered keypair — proves *who is asking*, not *what is authorised*. | Auth, credentials |
 | **Agent registry** | The Desk's record of every agent it has issued an identity to: public key, principal, identity, arrival. Holds no private keys and no authority. | Accounts, users, directory |
@@ -242,7 +244,9 @@ trade-off rather than just the outcome.
   [ADR-0011](docs/adr/0011-agent-identity-is-the-key-thumbprint.md)
 - **Mandates are ES256 and agent requests are Ed25519** — the known exception in
   [ADR-0002](docs/adr/0002-jws-ed25519-for-all-signing.md), widened in ticket 03 because
-  AP2's SDK can neither sign nor verify Ed25519
+  AP2's SDK can neither sign nor verify Ed25519. Ticket 05 met the same boundary from the
+  other side: the key-binding hop proves possession of the agent's key, so it is EdDSA where
+  AP2 advertises ES256
 - **Control room forks `pixel-agents`** —
   [ADR-0007](docs/adr/0007-control-room-forks-pixel-agents.md)
 - **Bank lines are synthesised; recon is never consumed** —
