@@ -130,6 +130,7 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 | **Key binding** | The `cnf` claim carrying the presenting agent's public key, which makes a stolen mandate useless to anyone else. | Agent name, agent ID |
 | **Principal** | The human whose key signs a mandate. | User, owner, account |
 | **Agent identity** | The agent's own registered keypair — proves *who is asking*, not *what is authorised*. | Auth, credentials |
+| **Agent registry** | The Desk's record of every agent it has issued an identity to: public key, principal, identity, arrival. Holds no private keys and no authority. | Accounts, users, directory |
 | **Trust score** | Per-agent reputation that gates spend ceiling and scrutiny tier. | Rating, karma |
 | **Spend ceiling** | The maximum a given agent may transact for, set by its rung on the ladder. Rungs have a minimum dwell time; that dwell time is the anti-farming mechanism. | Limit, quota |
 | **Scrutiny tier** | One of three discrete levels controlling how aggressively check 5 runs against an agent. | Strictness, mode |

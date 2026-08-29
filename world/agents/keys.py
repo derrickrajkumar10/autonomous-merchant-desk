@@ -1,4 +1,4 @@
-"""A buyer agent's own keypair -- the client side of the agent protocol.
+"""A buyer agent's own keypair -- the agent's half of the agent protocol.
 
 This is what an external agent does before it can talk to the Desk: generate a
 keypair, register the public half, sign every request with the private half. It lives
@@ -47,7 +47,12 @@ class AgentKeypair:
         return self.sign(json.dumps(body, sort_keys=True).encode("utf-8"), agent_id=agent_id)
 
     def sign(self, payload: bytes, *, agent_id: str, typ: str = AGENT_REQUEST_TYP) -> str:
-        """The signing primitive underneath ``sign_request``, for anything else signed."""
+        """The signing primitive underneath ``sign_request``.
+
+        Signs whatever bytes it is given under whatever type it is told, which is how
+        the red team and the tests produce things that are validly signed and still not
+        requests. An honest agent has no reason to reach past ``sign_request``.
+        """
         return jws_encode(
             payload,
             self._signing_key,

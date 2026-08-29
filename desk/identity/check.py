@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from desk.audit import AuditEntry, AuditTrail, EventType, ReasonCode
-from desk.identity.jws import RequestNotVerified, read_header, verify_request
+from desk.identity.jws import RequestHeader, RequestNotVerified, read_header, verify_request
 from desk.identity.registry import AgentIdentity, AgentRegistry
 
 #: What a refusal is recorded against when the request never named an agent. Subjects
@@ -63,10 +63,7 @@ class IdentityCheck:
             header = read_header(request)
         except RequestNotVerified as unreadable:
             return self._refuse(
-                subject_id=UNIDENTIFIED_AGENT,
-                claimed_agent_id=None,
-                algorithm=None,
-                reasoning=str(unreadable),
+                subject_id=UNIDENTIFIED_AGENT, claimed=None, reasoning=str(unreadable)
             )
 
         claimed_agent_id = header.claimed_agent_id
@@ -74,8 +71,7 @@ class IdentityCheck:
         if identity is None:
             return self._refuse(
                 subject_id=claimed_agent_id or UNIDENTIFIED_AGENT,
-                claimed_agent_id=claimed_agent_id,
-                algorithm=header.algorithm,
+                claimed=header,
                 reasoning=(
                     "no agent is registered under the key this request claims to be signed by"
                 ),
@@ -85,10 +81,7 @@ class IdentityCheck:
             body = verify_request(request, identity.public_key)
         except RequestNotVerified as invalid:
             return self._refuse(
-                subject_id=identity.agent_id,
-                claimed_agent_id=claimed_agent_id,
-                algorithm=header.algorithm,
-                reasoning=str(invalid),
+                subject_id=identity.agent_id, claimed=header, reasoning=str(invalid)
             )
 
         entry = self._trail.record(
@@ -101,11 +94,7 @@ class IdentityCheck:
                     "the signature verifies against the public key this agent registered, "
                     "so the request is from it and reached the Desk unaltered"
                 ),
-                "evidence": {
-                    "claimed_agent_id": claimed_agent_id,
-                    "algorithm": header.algorithm,
-                    "public_key": identity.public_key.base64url(),
-                },
+                "evidence": _evidence(header) | {"public_key": identity.public_key.base64url()},
                 # Identified, not authorised. Whether this agent may spend is checks 2
                 # and 3, and neither has run.
                 "state_change": {"request": "identified"},
@@ -114,12 +103,7 @@ class IdentityCheck:
         return IdentityOutcome(identity=identity, body=body, reason_code=None, entry=entry)
 
     def _refuse(
-        self,
-        *,
-        subject_id: str,
-        claimed_agent_id: str | None,
-        algorithm: str | None,
-        reasoning: str,
+        self, *, subject_id: str, claimed: RequestHeader | None, reasoning: str
     ) -> IdentityOutcome:
         entry = self._trail.record(
             actor="desk",
@@ -129,9 +113,7 @@ class IdentityCheck:
             payload={
                 "check": 1,
                 "reasoning": reasoning,
-                # The algorithm is recorded on every outcome, so a wrong-algorithm path
-                # is visible in the trail rather than silent (ADR-0002).
-                "evidence": {"claimed_agent_id": claimed_agent_id, "algorithm": algorithm},
+                "evidence": _evidence(claimed),
                 "state_change": {"request": "refused"},
             },
         )
@@ -141,3 +123,15 @@ class IdentityCheck:
             reason_code=ReasonCode.AGENT_SIGNATURE_INVALID,
             entry=entry,
         )
+
+
+def _evidence(claimed: RequestHeader | None) -> dict[str, Any]:
+    """What the request claimed about itself, recorded on every outcome.
+
+    The algorithm is here on a pass as well as a refusal, so a wrong-algorithm path is
+    visible in the trail rather than silent (ADR-0002). Both are ``None`` when the
+    request was not readable enough to claim anything.
+    """
+    if claimed is None:
+        return {"claimed_agent_id": None, "algorithm": None}
+    return {"claimed_agent_id": claimed.claimed_agent_id, "algorithm": claimed.algorithm}

@@ -122,7 +122,7 @@ def test_a_request_altered_after_signing_is_refused(
 def test_a_request_signed_by_another_registered_agent_is_refused(
     registry: AgentRegistry, identity_check: IdentityCheck, trail: AuditTrail
 ) -> None:
-    """Registration is not a shared credential: one agent cannot speak as another."""
+    """An identity is not transferable: one agent cannot speak as another."""
     asha = AgentKeypair.generate()
     ravi = AgentKeypair.generate()
     asha_id = _registered(registry, asha)

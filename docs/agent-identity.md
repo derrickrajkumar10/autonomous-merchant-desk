@@ -28,9 +28,14 @@ identity.agent_id        # 'agent-OmPH0Gxw3cVs3ZxZDMViGNkb09zX-gI4eV2ebq9n3Uc'
 ```
 
 The identity is the key's RFC 7638 thumbprint, so one key is one identity for ever and
-a returning agent re-registers into the identity it already has. Registering the same
-key under a *different* principal is refused: an identity does not change principal, a
-new key does.
+a returning agent re-registers into the identity it already has.
+
+Registering an already-registered key under a *different* principal is refused, and the
+attempt is written to the trail as `agent_registration_refused` /
+`agent_principal_mismatch`. A public key is public, so this is something a stranger can
+try: it is an attempt to move an identity's stated source of authority, which is worth
+seeing rather than merely raising. An identity does not change principal; a new key is
+a new identity.
 
 The registry holds five columns — the identity, the public key, its algorithm, the
 principal, and when it arrived. No private key material, ever; the Desk holds its own
@@ -136,10 +141,10 @@ trust:
 }
 ```
 
-That is the difference between a refusal and a rejection: a stated reason proves a
-check exists (CONTEXT.md section 5, principle 3). A refusal is recorded against the
-identity the request claimed, so an agent's detail panel shows the requests that failed
-in its name as well as the ones that succeeded.
+A stated reason proves a check exists; a generic refusal proves nothing (CONTEXT.md
+section 5, principle 3). A refusal is recorded against the identity the request
+claimed, so an agent's detail panel shows the requests that failed in its name as well
+as the ones that succeeded.
 
 ---
 

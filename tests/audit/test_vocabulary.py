@@ -68,8 +68,17 @@ SPEC_01_EVENT_TYPES = {
 }
 
 
-def test_reason_codes_are_exactly_the_adr_0006_vocabulary() -> None:
-    assert {code.value for code in ReasonCode} == ADR_0006_REASON_CODES
+# Members added since, each beside the ticket that added it and why. A code arriving
+# without a line here means the vocabulary grew without anyone deciding it should.
+ADDED_SINCE = {
+    # Ticket 02: a registered key re-presented naming a different principal, which is an
+    # attempt to move an identity's stated source of authority.
+    "agent_principal_mismatch",
+}
+
+
+def test_reason_codes_are_the_adr_0006_vocabulary_and_what_was_added_deliberately() -> None:
+    assert {code.value for code in ReasonCode} == ADR_0006_REASON_CODES | ADDED_SINCE
 
 
 def test_event_types_cover_every_event_named_in_spec_01() -> None:

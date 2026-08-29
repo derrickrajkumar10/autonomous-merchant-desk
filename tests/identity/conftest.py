@@ -2,8 +2,8 @@
 
 Every test enters through Seam A — the surface an external buyer agent uses. It
 generates a real keypair, registers it, and sends signed requests. Nothing reaches
-into the registry table or builds a credential object by hand, because an external
-agent could not do either.
+into the registry table or builds an identity by hand, because an external agent
+could not do either.
 """
 
 from __future__ import annotations

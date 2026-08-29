@@ -86,10 +86,11 @@ around the trail still cannot smuggle in a novel string. Growing either means ad
 a member **and** migrating the database type; installing against a database whose type
 disagrees raises `SchemaDrift` rather than running on quietly.
 
-### `reason_code` — the seventeen ADR-0006 members
+### `reason_code` — ADR-0006's seventeen, and what has been added since
 
 | Check / policy | Codes |
 |:---|:---|
+| Registration *(added: Ticket 02)* | `agent_principal_mismatch` |
 | 1 — identity | `agent_signature_invalid` |
 | 2 — mandate validity | `mandate_signature_invalid`, `mandate_expired`, `agent_mandate_mismatch` |
 | 3 — spend authority | `exceeds_remaining_balance`, `category_not_authorised`, `outside_validity_window` |
@@ -104,7 +105,7 @@ disagrees raises `SchemaDrift` rather than running on quietly.
 Each of the five checks passes or refuses under its own member, so that refusals
 break down by check (§9) without a consumer reading into a payload.
 
-`agent_registered`, `request_received`,
+`agent_registered`, `agent_registration_refused`, `request_received`,
 `check_1_identity_passed` / `_refused`,
 `check_2_mandate_validity_passed` / `_refused`,
 `check_3_spend_authority_passed` / `_refused`,

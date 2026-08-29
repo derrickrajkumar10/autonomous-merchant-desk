@@ -26,8 +26,12 @@ class ReasonCode(StrEnum):
     The seventeen members ADR-0006 names as the starting vocabulary: the four
     deterministic checks' refusals, the two judgment refusals, the margin floor, the
     blocked agent, the tier ceiling, the treasury buffer, and the two settlement-proof
-    outcomes.
+    outcomes. Members added since are grouped and dated by the ticket that added them,
+    so growth stays a deliberate act rather than a drift.
     """
+
+    # Registration (Ticket 02)
+    AGENT_PRINCIPAL_MISMATCH = "agent_principal_mismatch"
 
     # Check 1 - identity
     AGENT_SIGNATURE_INVALID = "agent_signature_invalid"
@@ -73,6 +77,7 @@ class EventType(StrEnum):
     """
 
     AGENT_REGISTERED = "agent_registered"
+    AGENT_REGISTRATION_REFUSED = "agent_registration_refused"
     REQUEST_RECEIVED = "request_received"
 
     CHECK_1_IDENTITY_PASSED = "check_1_identity_passed"

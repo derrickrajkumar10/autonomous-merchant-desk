@@ -2,7 +2,7 @@
 
 Registration is cheap and confers almost nothing. It buys an identity, not trust: a
 newly registered agent sits at the bottom rung under the strictest scrutiny, and
-nothing on ``AgentIdentity`` can be read as permission to spend. What it does buy is
+nothing on ``AgentIdentity`` can be read as authority to spend. What it does buy is
 accountability -- from here on, behaviour attaches to a key.
 
 The identity is the key's own thumbprint (ADR-0011), so one key is one identity for
@@ -14,12 +14,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, NoReturn
 
 from psycopg import Connection
 from psycopg_pool import ConnectionPool
 
-from desk.audit import AuditTrail, EventType
+from desk.audit import AuditTrail, EventType, ReasonCode
 from desk.identity.jws import AGENT_REQUEST_ALG
 from desk.identity.keys import AgentPublicKey
 from desk.identity.schema import TABLE
@@ -66,6 +66,11 @@ class AgentRegistry:
         The row and its trail entry commit together or not at all. A registered agent
         the trail never saw arrive, or an arrival recorded for an agent that was never
         registered, are both the trail disagreeing with reality.
+
+        Refused when a key already registered comes back naming a different principal.
+        A public key is public, so this is a thing a stranger can attempt: it is an
+        attempt to move an identity's stated source of authority, and it is recorded
+        under ``agent_principal_mismatch`` rather than merely raised.
         """
         if not isinstance(public_key, AgentPublicKey):
             raise TypeError(
@@ -78,9 +83,9 @@ class AgentRegistry:
         agent_id = public_key.agent_id
 
         with self._pool.connection() as conn:
-            existing = self._find(conn, agent_id)
-            if existing is not None:
-                return _returning(existing, public_key, principal_id)
+            registered = self._find(conn, agent_id)
+            if registered is not None:
+                return self._returning_agent(registered, principal_id)
 
             row = conn.execute(
                 f"INSERT INTO {TABLE} ({_COLUMNS})"
@@ -94,13 +99,13 @@ class AgentRegistry:
                 # The conflict is on whichever unique constraint that writer reached
                 # first, so no target is named; read-committed means its row is visible
                 # now that it has committed.
-                existing = self._find(conn, agent_id)
-                if existing is None:  # pragma: no cover - unreachable while ids derive from keys
+                registered = self._find(conn, agent_id)
+                if registered is None:  # pragma: no cover - impossible while ids derive from keys
                     raise RegistrationConflict(
-                        f"{agent_id} could not be registered: its public key is already "
-                        f"registered under a different identity"
+                        f"{agent_id} conflicted with a row that is not there. Not a refusal: "
+                        f"the registry contradicts itself."
                     )
-                return _returning(existing, public_key, principal_id)
+                return self._returning_agent(registered, principal_id)
 
             identity = _to_identity(row)
             self._trail.record(
@@ -135,21 +140,43 @@ class AgentRegistry:
         ).fetchone()
         return None if row is None else _to_identity(row)
 
+    def _returning_agent(self, registered: AgentIdentity, principal_id: str) -> AgentIdentity:
+        """The identity a returning agent keeps, unless it is not who it was before.
 
-def _returning(
-    existing: AgentIdentity, public_key: AgentPublicKey, principal_id: str
-) -> AgentIdentity:
-    """The identity a returning agent keeps, or a refusal if it is not who it was."""
-    if existing.public_key != public_key:
-        raise RegistrationConflict(
-            f"{existing.agent_id} is already registered to a different public key"
+        The key needs no comparison here: the identity *is* its thumbprint, so a row
+        found under this identity is a row for this key or the registry is broken.
+        """
+        if registered.principal_id != principal_id:
+            self._refuse_principal_change(registered, principal_id)
+        return registered
+
+    def _refuse_principal_change(self, registered: AgentIdentity, claimed: str) -> NoReturn:
+        """Record the attempt, then refuse it.
+
+        Written on its own transaction rather than the caller's: nothing was
+        registered, so there is no state change for the entry to commit with, and it
+        has to outlive a call that ends by raising.
+        """
+        reasoning = (
+            f"{registered.agent_id} acts for {registered.principal_id!r} and a registration "
+            f"claimed {claimed!r} for it. An identity does not change principal; a new key "
+            f"is a new identity."
         )
-    if existing.principal_id != principal_id:
-        raise RegistrationConflict(
-            f"{existing.agent_id} is registered as acting for {existing.principal_id!r}, "
-            f"not {principal_id!r}. An identity does not change principal; a new key does."
+        self._trail.record(
+            actor="desk",
+            event_type=EventType.AGENT_REGISTRATION_REFUSED,
+            subject_id=registered.agent_id,
+            reason_code=ReasonCode.AGENT_PRINCIPAL_MISMATCH,
+            payload={
+                "reasoning": reasoning,
+                "evidence": {
+                    "registered_principal_id": registered.principal_id,
+                    "claimed_principal_id": claimed,
+                },
+                "state_change": {"agent_identity": "unchanged"},
+            },
         )
-    return existing
+        raise RegistrationConflict(reasoning)
 
 
 def _to_identity(row: Sequence[Any]) -> AgentIdentity:

@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from psycopg_pool import ConnectionPool
 
-from desk.audit import AuditTrail, EventType
+from desk.audit import AuditTrail, EventType, ReasonCode
 from desk.identity import AgentRegistry, PrincipalPublicKey, RegistrationConflict
 from world.agents.keys import AgentKeypair
 
@@ -71,6 +71,27 @@ def test_a_registered_key_cannot_change_the_principal_it_acts_for(registry: Agen
         registry.register(public_key=keypair.public_key, principal_id="principal-ravi")
 
 
+def test_a_refused_principal_change_is_recorded_with_its_reason(
+    registry: AgentRegistry, trail: AuditTrail
+) -> None:
+    """A public key is public, so a stranger can attempt this. It should be visible."""
+    keypair = AgentKeypair.generate()
+    identity = registry.register(public_key=keypair.public_key, principal_id="principal-asha")
+
+    with pytest.raises(RegistrationConflict):
+        registry.register(public_key=keypair.public_key, principal_id="principal-ravi")
+
+    (entry,) = trail.query(event_type=EventType.AGENT_REGISTRATION_REFUSED)
+    assert entry.subject_id == identity.agent_id
+    assert entry.reason_code is ReasonCode.AGENT_PRINCIPAL_MISMATCH
+    assert entry.payload["evidence"] == {
+        "registered_principal_id": "principal-asha",
+        "claimed_principal_id": "principal-ravi",
+    }
+    assert registry.find(identity.agent_id) == identity
+    assert trail.verify().ok
+
+
 def test_two_agents_get_two_identities(registry: AgentRegistry) -> None:
     one = registry.register(
         public_key=AgentKeypair.generate().public_key, principal_id="principal-asha"
@@ -119,7 +140,7 @@ def test_a_principal_key_cannot_stand_in_for_an_agent_key(registry: AgentRegistr
 def test_registration_confers_no_spend_authority(
     registry: AgentRegistry, trail: AuditTrail
 ) -> None:
-    """An identity, not trust. Nothing on it can be read as permission to spend."""
+    """An identity, not trust. Nothing on it can be read as authority to spend."""
     keypair = AgentKeypair.generate()
 
     identity = registry.register(public_key=keypair.public_key, principal_id="principal-asha")
@@ -138,7 +159,13 @@ def test_registration_confers_no_spend_authority(
 def test_the_registry_holds_no_private_key_material(
     registry: AgentRegistry, pool: ConnectionPool
 ) -> None:
-    """The Desk holds its own private key and nobody else's."""
+    """The Desk holds its own private key and nobody else's.
+
+    The one test here that reads the registry table rather than the trail, deliberately:
+    the claim is about what the Desk does *not* store, and an absence leaves no entry.
+    It asserts the column list and nothing else, so it stays a statement about the
+    guarantee rather than about the implementation.
+    """
     keypair = AgentKeypair.generate()
     registry.register(public_key=keypair.public_key, principal_id="principal-asha")
 
