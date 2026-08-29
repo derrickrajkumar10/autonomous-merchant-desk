@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from jwt.api_jws import decode as jws_decode
@@ -97,7 +98,11 @@ def verify_request(request: str, public_key: AgentPublicKey) -> dict[str, Any]:
         ) from exc
 
     try:
-        body = json.loads(payload)
+        # parse_float, because a request body carries money. AP2 types an amount as a
+        # JSON number, and 1000.10 read as a float is not 1000.10 -- the mandate reader
+        # takes the same precaution for the same reason, and a ceiling drawn down by a
+        # number nobody wrote is the kind of defect noticed after the money has moved.
+        body = json.loads(payload, parse_float=Decimal)
     except ValueError as exc:
         raise RequestNotVerified(f"the signed payload is not JSON: {exc}") from exc
     if not isinstance(body, dict):
