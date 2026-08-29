@@ -233,13 +233,18 @@ There is a test for each of these that fails if you swap the fingerprints back.
 
 ## 7. Seeing it for yourself
 
-Real output from [`ticket-04-demo.py`](ticket-04-demo.py), which wires up the whole
-spine against a real Postgres — enrol a principal, register an agent, sign both
-mandates, run checks 2 and 3 — then makes four requests against one two-thousand-rupee
-ceiling and one for the wrong thing. Run it yourself:
+Real output from
+[`tests/spend/test_explainer_walkthrough.py`](../../tests/spend/test_explainer_walkthrough.py),
+which wires up the whole spine against a real Postgres — enrol a principal, register an
+agent, sign both mandates, run checks 2 and 3 — then makes four requests against one
+two-thousand-rupee ceiling and one for the wrong thing.
+
+It is a **test**, not a script, and that is deliberate: it asserts the numbers below, so
+if check 3's behaviour ever changes this page stops being true *and the suite goes red*.
+Quoted output that nothing runs is quoted output that quietly rots. See it for yourself:
 
 ```
-.venv/Scripts/python.exe docs/explainers/ticket-04-demo.py
+.venv/Scripts/python.exe -m pytest tests/spend/test_explainer_walkthrough.py -s
 ```
 
 ```
@@ -347,14 +352,14 @@ Run on 2026-08-29 against Python 3.11.9 and an embedded Postgres:
 
 | Environment | Result |
 |:---|:---|
-| Project venv, no SDK | **179 passed, 1 skipped** |
-| Throwaway venv with the SDK | **184 passed** |
+| Project venv, no SDK | **181 passed, 1 skipped** |
+| Throwaway venv with the SDK | **186 passed** |
 
 The skip is the conformance module, which skips at import when the SDK is absent and
 says how to build the environment that runs it — so one skip stands for the five tests
 inside it, two of which are new here and exercise the Payment Mandate in both
 directions. `ruff check`, `ruff format --check` and `mypy --strict` are clean across all
-56 files.
+57 files.
 
 ## 10. What this ticket deliberately does not do
 
