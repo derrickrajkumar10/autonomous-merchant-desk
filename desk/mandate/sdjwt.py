@@ -38,8 +38,9 @@ Four refusals here are less obvious than the rest and each closes a real hole:
 - A disclosure that would **overwrite** a claim already present is refused, so
   material sent later can never displace material the principal sent in the clear.
 
-Writing SD-JWTs is not the Desk's job. The principal's wallet issues mandates
-(``world/wallet/``); the Desk only ever reads them.
+This is the verifier half. Issuing is ``issue.py``, which the principal's wallet uses
+for the mandates it signs and the Desk uses for the one artefact it signs itself -- the
+closed Checkout Mandate a negotiation ends in.
 """
 
 from __future__ import annotations

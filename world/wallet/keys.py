@@ -18,19 +18,21 @@ mandates with. The claims are hidden behind a digest and sent alongside as a
 *disclosure*, which is the format's whole point: a holder may drop any disclosure and
 what remains still verifies. The wallet discloses everything it signs -- deciding what
 to withhold is the holder's choice to make, not the issuer's.
+
+The mechanics of that -- salt, digest, and the shape on the wire -- are
+``desk.mandate.issue``'s, shared with the one artefact the Desk signs for itself. What
+stays here is the part that is the wallet's alone: the key, and what a principal's
+authorisation may say.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
-import secrets
 from collections.abc import Mapping, Sequence
 from typing import Any, Self
 
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
 from jwt.api_jws import encode as jws_encode
-from jwt.utils import base64url_encode
 
 from desk.identity import AgentPublicKey, PrincipalPublicKey
 from desk.mandate import (
@@ -38,17 +40,15 @@ from desk.mandate import (
     OPEN_CHECKOUT_VCT,
     OPEN_PAYMENT_VCT,
     PAYMENT_REFERENCE_CONSTRAINT,
+    SALT_BYTES,
+    SD_JWT_TYP,
     digest_of,
+    disclose,
+    present,
+    sd_jwt_claims,
 )
 
-#: The ``typ`` RFC 9901's own reference implementation stamps on an SD-JWT, and
-#: therefore what AP2's SDK emits. Ours says the same thing so that a stranger's
-#: verifier comparing against the reference finds what it expects.
-SD_JWT_TYP = "example+sd-jwt"
-
-#: Sixteen bytes of salt per disclosure, which is what RFC 9901's examples use. The
-#: salt is why two disclosures of the same value do not digest alike.
-SALT_BYTES = 16
+__all__ = ["SALT_BYTES", "SD_JWT_TYP", "PrincipalKeypair"]
 
 
 class PrincipalKeypair:
@@ -159,35 +159,11 @@ class PrincipalKeypair:
         missing ``cnf``, no line items. An honest wallet has no reason to reach past
         the method above.
         """
-        disclosure = _disclosure(content)
-        claims = {
-            # The claims sit one level down under ``delegate_payload``, matching what
-            # AP2's SDK emits, so that a chain hop can be appended in a later ticket
-            # without the shape changing underneath a verifier that already read one.
-            "delegate_payload": [{"...": _digest(disclosure)}],
-            "_sd_alg": "sha-256",
-        }
+        disclosure = disclose(content)
         issuer_jws = jws_encode(
-            json.dumps(claims, separators=(",", ":")).encode("utf-8"),
+            json.dumps(sd_jwt_claims(disclosure), separators=(",", ":")).encode("utf-8"),
             self._signing_key,
             algorithm=MANDATE_ALG,
             headers={"kid": principal_id, "typ": SD_JWT_TYP},
         )
-        return f"{issuer_jws}~{disclosure}~"
-
-
-def _disclosure(content: Mapping[str, Any]) -> str:
-    """One array-element disclosure: a fresh salt and the value, base64url encoded.
-
-    The separators are RFC 9901's, not Python's defaults. The digest is taken over
-    these exact characters, so a verifier that re-encoded the JSON would compute a
-    different one -- which is why the encoded string, and not the value, is what
-    travels.
-    """
-    salt = base64url_encode(secrets.token_bytes(SALT_BYTES)).decode("ascii")
-    encoded = json.dumps([salt, dict(content)], separators=(", ", ": "))
-    return base64url_encode(encoded.encode("utf-8")).decode("ascii")
-
-
-def _digest(disclosure: str) -> str:
-    return base64url_encode(hashlib.sha256(disclosure.encode("ascii")).digest()).decode("ascii")
+        return present(issuer_jws, disclosure)

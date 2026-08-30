@@ -74,6 +74,9 @@ PERMITTED = frozenset(
         "psycopg",
         "psycopg_pool",
         "re",
+        # Salt for an SD-JWT disclosure. The one source of randomness the mandate
+        # library holds, and it goes into a digest rather than into a decision.
+        "secrets",
         "typing",
     }
 )
