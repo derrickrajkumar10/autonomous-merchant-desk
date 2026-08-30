@@ -45,6 +45,8 @@ arithmetic and the table -- the part a panel would ask about.
 from desk.catalogue.margin import (
     PERCENT_PLACES,
     RATE_PLACES,
+    Charge,
+    ChargeMargin,
     Line,
     LineMargin,
     Margin,
@@ -61,6 +63,8 @@ __all__ = [
     "SKU",
     "TABLE",
     "Catalogue",
+    "Charge",
+    "ChargeMargin",
     "Line",
     "LineMargin",
     "Margin",

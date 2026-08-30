@@ -142,7 +142,35 @@ combined floor comes out as a revenue-weighted blend of the lines' own floors. F
 grinder-and-coffee bundle that is 26.11 percent, sitting between the grinder's 25 and
 the coffee's 30, and nearer the grinder because the grinder is most of the money.
 
-## 6. The vocabulary, now that you need it
+## 6. A deal is not only goods
+
+Everything so far treats a deal as a list of products. Real deals carry things that are
+not products: it costs something to pack a box and get it to somebody, and it costs more
+to get it there by Friday. Those amounts belong to *this* deal at *these* terms rather
+than to any one product, so they ride on the offer separately, as **charges**.
+
+A charge is a label, an amount the buyer pays, and an amount it costs the Desk. Two
+shapes matter, and they are the reason two of the negotiation's levers are arithmetic
+rather than assertion:
+
+- **Cost and no revenue.** The fixed work of putting one deal out of the door. It does
+  not double when the order does, so a bigger order spreads it thinner — which is what
+  makes a lower rate at volume something the Desk can actually afford.
+- **Revenue and cost.** Express delivery charged at a premium. The buyer pays four
+  hundred, the courier takes two hundred and forty, and the hundred and sixty left over
+  is margin the goods never had to find. That is how the Desk can hold a tenth off the
+  grinder — the goods were not made cheaper, the deal was made bigger.
+
+**A charge asks for no floor of its own.** A margin floor is a promise about what the
+Desk earns on what it *sells*, and a courier's share is not that. So a charge hands its
+profit to what the lines were already asked for and asks nothing back.
+
+That does mean a charge can make a floor easier to clear, which would be a hole if a
+counterparty could add one. None can. Charges are written by the Desk's own terms and
+are never read off a request, so the only party that can put one on a deal is the party
+the floor is protecting.
+
+## 7. The vocabulary, now that you need it
 
 - **Desk** — our system. The merchant that sells to machines.
 - **Product** — one thing the Desk sells, carrying a cost, a list price and a floor.
@@ -154,13 +182,15 @@ the coffee's 30, and nearer the grinder because the grinder is most of the money
 - **Offer** — what the Desk is proposing right now: one or more **lines**, each a
   product, a quantity and a unit price. The price lives here and not on the product,
   because the price is the negotiable part.
+- **Charge** — a part of a deal that is not a product: handling, express delivery. It
+  carries revenue and cost and no floor of its own.
 - **Lever** — a non-price concession. A bundle is one; so is a quantity break. The
   vocabulary calls them levers rather than discounts on purpose.
 - **Walk-away** — refusing a deal below the floor. A correct outcome.
 - **Catalogue** — the Desk's table of products. **Storefront** — the file in `world/`
   saying which products there are.
 
-## 7. Watching it happen
+## 8. Watching it happen
 
 Three passes over those same three products, printed by
 `tests/catalogue/test_explainer_walkthrough.py`, which asserts every line below so this
@@ -189,7 +219,7 @@ Those one-line rationales are what FR-5.4 asks for: beside every Desk reply, a
 machine-readable line saying what the margin is, what was asked, and whether it sits
 inside the floor. Ticket 08 puts them on the screen.
 
-## 8. The part where nothing is allowed to round
+## 9. The part where nothing is allowed to round
 
 There is one genuinely subtle thing in this ticket and it is worth the section.
 
@@ -238,11 +268,11 @@ discount to that scale sent every price under 1,500 back to either the full list
 or zero. A discount silently becoming no discount is the quietest way this method could
 be wrong, so the scale is clamped instead of trusted.
 
-## 9. Where the code lives, and the split that matters
+## 10. Where the code lives, and the split that matters
 
 ```
 desk/catalogue/product.py   the three numbers, and what makes a product valid
-desk/catalogue/margin.py    lines, offers, and the comparison that decides
+desk/catalogue/margin.py    lines, charges, offers, and the comparison that decides
 desk/catalogue/schema.py    the product table
 desk/catalogue/store.py     seeding it, and reading it back
 world/storefront/           which products actually exist
@@ -273,7 +303,7 @@ The guard that works is `cost < 'Infinity'`, false for `NaN` and for infinity bo
 guard most people reach for, `cost = cost`, does nothing here: `numeric` NaN compares
 *equal* to itself, which is the opposite of the float rule everyone is remembering.
 
-## 10. What this ticket deliberately does not do
+## 11. What this ticket deliberately does not do
 
 - **It does not negotiate.** Nothing here decides what to offer, chooses a lever, or
   talks to anybody. It answers "what would this deal earn, and is that enough?" and
@@ -286,17 +316,18 @@ guard most people reach for, `cost = cost`, does nothing here: `numeric` NaN com
   number is computable and would be convenient, and it is left out on purpose: it is a
   price floor, and naming one would put back the exact concept §6 of CONTEXT.md bans.
   A negotiator that needs it can derive it, per offer, and own the name it gives it.
-- **Cost does not move with quantity.** Buying five hundred kilos more cheaply than one
-  is real, and it is a procurement question — ticket 14, landed cost. Here a quantity
-  break moves the profit and leaves the margin exactly where it was, which is precisely
-  why it is a lever and not a way around the floor.
+- **Unit cost does not move with quantity.** Buying five hundred kilos more cheaply
+  than one is real, and it is a procurement question — ticket 14, landed cost. What does
+  move here is the *fixed* cost of a deal, which a charge carries and a bigger order
+  spreads thinner (§6). So a quantity break is affordable for a reason the floor can
+  see, rather than being a way around it.
 - **There is no stock level, no supplier, no availability.** Seven columns, and the
   shortness is the guarantee.
 
-## 11. If you want to read the code
+## 12. If you want to read the code
 
 Start with `desk/catalogue/margin.py` and read its module docstring — three ideas, and
-the third is section 8 above. Then `product.py` for what makes a product valid, and
+the third is section 9 above. Then `product.py` for what makes a product valid, and
 `store.py` for the two operations the table supports.
 
 The tests are the other way in. `tests/catalogue/test_bundle.py` is the shortest
