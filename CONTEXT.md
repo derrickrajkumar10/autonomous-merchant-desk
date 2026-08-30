@@ -242,6 +242,8 @@ trade-off rather than just the outcome.
   [ADR-0006](docs/adr/0006-audit-trail-is-a-hash-chained-postgres-table.md)
 - **An agent's identity is its key's thumbprint** —
   [ADR-0011](docs/adr/0011-agent-identity-is-the-key-thumbprint.md)
+- **The Desk signs the closed Checkout Mandate**, including the outer envelope AP2 gives
+  to the agent — [ADR-0012](docs/adr/0012-the-desk-signs-the-closed-checkout-mandate.md)
 - **Mandates are ES256 and agent requests are Ed25519** — the known exception in
   [ADR-0002](docs/adr/0002-jws-ed25519-for-all-signing.md), widened in ticket 03 because
   AP2's SDK can neither sign nor verify Ed25519. Ticket 05 met the same boundary from the
