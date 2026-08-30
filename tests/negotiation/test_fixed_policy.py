@@ -37,9 +37,7 @@ def rupees(amount: str) -> Money:
     return Money.of(amount, "INR")
 
 
-def propose(
-    ask: Ask, product: Product = COFFEE, *, companions: Sequence[Product] = ()
-) -> Proposal:
+def propose(ask: Ask, product: Product = COFFEE, *, companions: Sequence[Product] = ()) -> Proposal:
     return POLICY.propose(
         Position(
             ask=ask,

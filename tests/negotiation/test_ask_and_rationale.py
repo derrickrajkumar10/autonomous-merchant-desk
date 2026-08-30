@@ -80,9 +80,7 @@ def test_the_most_a_buyer_would_take_is_not_less_than_what_it_asked_for() -> Non
 
 def test_a_rationale_carries_the_margin_the_floor_and_the_gap() -> None:
     """The three things FR-5.4 names, in the object the control room draws."""
-    rationale = Rationale(
-        asked="10% off, 1 x SKU-GRINDER-BURR", margin=_margin_on_grinder("0.10")
-    )
+    rationale = Rationale(asked="10% off, 1 x SKU-GRINDER-BURR", margin=_margin_on_grinder("0.10"))
 
     payload = rationale.as_payload()
 

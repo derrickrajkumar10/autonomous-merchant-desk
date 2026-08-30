@@ -55,9 +55,7 @@ def a_checkout(*, charges: tuple[AgreedCharge, ...] = ()) -> Checkout:
         open_checkout=OPEN_DIGEST,
         currency="INR",
         items=(
-            AgreedItem(
-                item_id="SKU-COFFEE-1KG", quantity=2, unit_price=Money.of("809.10", "INR")
-            ),
+            AgreedItem(item_id="SKU-COFFEE-1KG", quantity=2, unit_price=Money.of("809.10", "INR")),
         ),
         charges=charges,
         terms={"delivery": "standard", "payment": "prepaid"},

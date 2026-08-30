@@ -53,6 +53,13 @@ deal spec is ticket 19's, and until then a counterparty is whatever drives ``rec
 """
 
 from desk.negotiation.ask import Ask
+from desk.negotiation.deal import (
+    ROUNDS,
+    Desk,
+    DeskMessage,
+    Negotiation,
+    NegotiationOver,
+)
 from desk.negotiation.lever import CONSIDERED, Lever
 from desk.negotiation.policy import (
     REACH,
@@ -82,11 +89,16 @@ __all__ = [
     "EXPRESS",
     "HANDLING",
     "REACH",
+    "ROUNDS",
     "Ask",
     "Delivery",
+    "Desk",
+    "DeskMessage",
     "FixedPolicy",
     "Lever",
     "Move",
+    "Negotiation",
+    "NegotiationOver",
     "Payment",
     "Policy",
     "Position",

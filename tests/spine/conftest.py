@@ -82,6 +82,7 @@ def a_request(
     amount: Any = ASKING,
     currency: Any = "INR",
     sku: str = COFFEE,
+    also: str | None = None,
     ceiling: str = CEILING,
     ceiling_currency: str = "INR",
     lifetime: int = AN_HOUR,
@@ -107,6 +108,9 @@ def a_request(
     signs the *request* with a key the Desk never registered while ``claiming`` still
     names ours, ``hop_age`` backdates the proof of possession.
 
+    ``also`` puts a second acceptable item in the Checkout Mandate, which is what a
+    principal authorising two things looks like.
+
     ``body`` replaces the request body outright, which is how a request that is validly
     signed and still not a purchase request gets built. Nothing else about the request
     changes; check 1 passes it, and what happens next is the spine's reading of it.
@@ -126,7 +130,7 @@ def a_request(
     checkout_mandate = issuer.sign_open_checkout_mandate(
         principal_id=PRINCIPAL_ID,
         agent_key=bound,
-        constraints=[line_items(sku=sku)],
+        constraints=[line_items(sku=sku, also=also)],
         issued_at=now - hop_age,
         expires_at=now + lifetime,
     )

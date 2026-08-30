@@ -31,17 +31,22 @@ __all__ = [
 ]
 
 
-def line_items(sku: str = "SKU-COFFEE-1KG", quantity: int = 2) -> dict[str, Any]:
-    """The one constraint AP2 makes mandatory on an open Checkout Mandate."""
+def line_items(
+    sku: str = "SKU-COFFEE-1KG", quantity: int = 2, also: str | None = None
+) -> dict[str, Any]:
+    """The one constraint AP2 makes mandatory on an open Checkout Mandate.
+
+    ``also`` adds a second acceptable item, which is how a principal authorises more than
+    one thing in a single constraint. The negotiation suite needs it: a bundle companion
+    has to be something the mandate names, so a mandate naming one sku can never produce
+    one.
+    """
+    acceptable = [{"id": sku, "title": "Single origin beans, 1kg"}]
+    if also is not None:
+        acceptable.append({"id": also, "title": "Something else the principal allowed"})
     return {
         "type": "checkout.line_items",
-        "items": [
-            {
-                "id": "beans",
-                "acceptable_items": [{"id": sku, "title": "Single origin beans, 1kg"}],
-                "quantity": quantity,
-            }
-        ],
+        "items": [{"id": "beans", "acceptable_items": acceptable, "quantity": quantity}],
     }
 
 

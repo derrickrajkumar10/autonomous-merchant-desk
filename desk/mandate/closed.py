@@ -302,9 +302,7 @@ def _read_checkout(checkout_jws: str, *, key: DeskPublicKey) -> Checkout:
         currency=currency,
         items=tuple(_item(claim, currency) for claim in _list(claims.get("line_items"))),
         charges=tuple(_charge(claim, currency) for claim in _list(claims.get("charges"))),
-        terms={
-            str(name): str(value) for name, value in _mapping(claims.get("terms")).items()
-        },
+        terms={str(name): str(value) for name, value in _mapping(claims.get("terms")).items()},
         agreed_at=agreed_at,
     )
 

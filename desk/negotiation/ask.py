@@ -66,9 +66,7 @@ class Ask:
         if isinstance(self.quantity, bool) or not isinstance(self.quantity, int):
             raise TypeError(f"a quantity is a whole count, not a {type(self.quantity).__name__}")
         if self.quantity < 1:
-            raise ValueError(
-                f"an ask for {self.quantity} of {self.sku} is not an ask to buy it"
-            )
+            raise ValueError(f"an ask for {self.quantity} of {self.sku} is not an ask to buy it")
         if self.target_unit_price is not None and not isinstance(self.target_unit_price, Money):
             raise TypeError("a target price is Money, or it is absent")
         if self.largest_quantity is not None:

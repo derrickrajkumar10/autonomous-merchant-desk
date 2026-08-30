@@ -66,7 +66,7 @@ def test_prepayment_costs_nothing_to_carry() -> None:
 
 
 def test_express_delivery_puts_more_in_than_it_takes_out() -> None:
-    """"At a premium" in FR-5.3 means the Desk sells speed rather than giving it away."""
+    """ "At a premium" in FR-5.3 means the Desk sells speed rather than giving it away."""
     express = TERMS.charges(FAST, goods=COFFEE.list_price)[1]
 
     assert express.revenue - express.cost == Money.of("160.00", "INR")
