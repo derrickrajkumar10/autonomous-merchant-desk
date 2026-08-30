@@ -135,9 +135,13 @@ class Proposal:
     """What the policy decided, and the offer it decided about.
 
     An offer is present on a walk-away too -- the best arrangement the Desk could have
-    made. Its margin is what the rationale reports, so a walk-away is recorded with a
-    real number rather than with an absence, and a reader can see how far apart the two
-    parties actually were.
+    made, so that a reader can see how far apart the two parties actually were rather
+    than only that they were apart.
+
+    ``asked_margin`` is the other half of that, and it is the one a walk-away is
+    *about*: the margin on the deal the buyer actually proposed, which is the thing
+    sitting under the floor. Absent when the buyer named no price, because there is then
+    no proposed deal for it to be the margin of.
     """
 
     move: Move
@@ -145,6 +149,7 @@ class Proposal:
     terms: Terms
     lever: Lever | None
     unit_price: Money
+    asked_margin: Margin | None = None
 
     @property
     def margin(self) -> Margin:
@@ -176,27 +181,35 @@ class FixedPolicy:
             # would be the Desk profiting from a mistake, and the trail would record it.
             return self._quote(position, plain)
 
-        # What the buyer asked for, exactly as asked, with nothing traded for it.
-        if margin_on(plain.offer(position.product, asked, position.sheet)).inside_floor:
-            return _proposal(Move.ACCEPT, position, plain, asked)
+        # What the buyer asked for, exactly as asked, with nothing traded for it. Its
+        # margin is carried on every answer from here down, because it is the number a
+        # refusal is about and the one FR-5.4 means by "whether it sits inside the floor".
+        on_the_ask = margin_on(plain.offer(position.product, asked, position.sheet))
+        if on_the_ask.inside_floor:
+            return _proposal(Move.ACCEPT, position, plain, asked, asked_margin=on_the_ask)
 
         # It does not hold on its own. Does it hold inside some arrangement the buyer's
         # own stated constraints make available? This is FR-5.3's sentence: the discount
         # is declined and something else is offered in the same message.
         for shape in shapes[1:]:
             if margin_on(shape.offer(position.product, asked, position.sheet)).inside_floor:
-                return _proposal(Move.COUNTER, position, shape, asked)
+                return _proposal(Move.COUNTER, position, shape, asked, asked_margin=on_the_ask)
 
         # Nothing reaches the buyer's number. Find the closest the Desk can get.
         best = _best(position, shapes)
         if best is None:
             # No arrangement holds at any price the Desk would name. Nothing to discuss.
-            return _proposal(Move.WALK_AWAY, position, plain, position.product.list_price)
+            return _proposal(
+                Move.WALK_AWAY,
+                position,
+                plain,
+                position.product.list_price,
+                asked_margin=on_the_ask,
+            )
 
         shape, price = best
-        if _out_of_reach(asked, price):
-            return _proposal(Move.WALK_AWAY, position, shape, price)
-        return _proposal(Move.COUNTER, position, shape, price)
+        move = Move.WALK_AWAY if _out_of_reach(asked, price) else Move.COUNTER
+        return _proposal(move, position, shape, price, asked_margin=on_the_ask)
 
     def _quote(self, position: Position, plain: Shape) -> Proposal:
         """List price on ordinary terms -- and a walk-away if even that does not hold."""
@@ -412,13 +425,21 @@ def _out_of_reach(asked: Money, best: Money) -> bool:
         return asked.amount < best.amount * (Decimal(1) - REACH)
 
 
-def _proposal(move: Move, position: Position, shape: Shape, price: Money) -> Proposal:
+def _proposal(
+    move: Move,
+    position: Position,
+    shape: Shape,
+    price: Money,
+    *,
+    asked_margin: Margin | None = None,
+) -> Proposal:
     return Proposal(
         move=move,
         offer=shape.offer(position.product, price, position.sheet),
         terms=shape.terms,
         lever=shape.lever,
         unit_price=price,
+        asked_margin=asked_margin,
     )
 
 

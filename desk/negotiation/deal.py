@@ -45,7 +45,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from desk.audit import AuditEntry, AuditTrail, EventType, ReasonCode
-from desk.catalogue import Catalogue, Product, UnknownProduct
+from desk.catalogue import Catalogue, Margin, Product, UnknownProduct
 from desk.identity import AgentIdentity, DeskKeypair
 from desk.mandate import AgreedCharge, AgreedItem, Checkout, close_checkout
 from desk.negotiation.ask import Ask
@@ -82,6 +82,9 @@ class DeskMessage:
     """
 
     move: Move
+    #: On an acceptance or a counter, the price on the table. On a walk-away, the closest
+    #: the Desk could have got -- which is not an offer, and is here so a reader can see
+    #: how far apart the two parties were.
     offer_unit_price: Money
     quantity: int
     terms: Terms
@@ -377,11 +380,18 @@ class Negotiation:
     def _walk(self, ask: Ask, proposal: Proposal, *, reasoning: str) -> DeskMessage:
         """A walk-away, recorded as the completed negotiation it is."""
         self._over = True
-        # No lever on a walk-away. The proposal carries the best arrangement the Desk
-        # could have reached, and its margin is worth recording -- but nothing was put on
-        # the table, and a rationale that named a lever would say something that did not
-        # happen.
-        rationale = _rationale(ask, proposal, lever=None)
+        # A walk-away's rationale is about the deal that was *refused* and not about the
+        # one the Desk could have reached. ``below_margin_floor`` is a statement about the
+        # buyer's number, and reporting the Desk's own reachable margin here would record
+        # a walk-away as sitting comfortably inside its floor -- true of a deal that never
+        # happened, and the opposite of an explanation.
+        #
+        # And no lever, for the same reason: the proposal carries the best arrangement
+        # available, which is worth having in the evidence, but nothing was put on the
+        # table and a rationale naming a lever would say something that did not happen.
+        rationale = _rationale(
+            ask, proposal, lever=None, margin=proposal.asked_margin or proposal.margin
+        )
         entry = self._record(
             EventType.WALKED_AWAY,
             reason_code=ReasonCode.BELOW_MARGIN_FLOOR,
@@ -439,6 +449,7 @@ class Negotiation:
                         "terms": proposal.terms.as_claims(),
                         "bundled": [line.product.sku for line in proposal.offer.lines[1:]],
                     },
+                    "reachable": str(proposal.unit_price),
                     "rationale": rationale.as_payload(),
                 },
                 "state_change": state_change,
@@ -446,7 +457,13 @@ class Negotiation:
         )
 
 
-def _rationale(ask: Ask | None, proposal: Proposal, *, lever: Lever | None) -> Rationale:
+def _rationale(
+    ask: Ask | None,
+    proposal: Proposal,
+    *,
+    lever: Lever | None,
+    margin: Margin | None = None,
+) -> Rationale:
     """The FR-5.4 object for one message: what was asked, and where the margin landed."""
     if ask is None:
         asked = "the offer on the table"
@@ -454,4 +471,6 @@ def _rationale(ask: Ask | None, proposal: Proposal, *, lever: Lever | None) -> R
         asked = f"a price for {ask.quantity} x {ask.sku}"
     else:
         asked = f"{ask.target_unit_price} each for {ask.quantity} x {ask.sku}"
-    return Rationale(asked=asked, margin=proposal.margin, lever=lever)
+    return Rationale(
+        asked=asked, margin=proposal.margin if margin is None else margin, lever=lever
+    )

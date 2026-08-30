@@ -249,7 +249,7 @@ def test_a_buyer_far_below_the_floor_is_walked_away_from_as_a_success(
     assert written[0].payload["state_change"] == {"deal": "walked away"}
 
 
-def test_a_walk_away_still_records_where_the_margin_would_have_been(
+def test_a_walk_away_reports_the_margin_on_the_deal_it_refused(
     spine: TrustSpine,
     selling: Desk,
     trail: AuditTrail,
@@ -257,13 +257,25 @@ def test_a_walk_away_still_records_where_the_margin_would_have_been(
     agent: AgentKeypair,
     identity: AgentIdentity,
 ) -> None:
-    """A reader should be able to see how far apart the two parties actually were."""
+    """``below_margin_floor`` is a statement about the buyer's number, so that is the
+    number the rationale reports.
+
+    The alternative -- reporting the margin on the best offer the Desk could have made --
+    would record every walk-away as sitting comfortably inside its floor, which is true
+    of a deal that never happened and is the opposite of an explanation. Where the Desk
+    could have got to goes in the evidence beside it, as ``reachable``.
+    """
     deal = opened(spine, selling, wallet, agent, identity)
 
     reply = deal.receive(Ask(sku=COFFEE.sku, quantity=1, target_unit_price=rupees("300.00")))
 
-    assert reply.rationale.as_payload()["surplus"] is not None
-    assert reply.rationale.as_payload()["lever"] is None
+    payload = reply.rationale.as_payload()
+    assert payload["inside_floor"] is False
+    assert Decimal(payload["surplus"]) < 0
+    assert payload["lever"] is None
+    assert negotiation_entries(trail)[0].payload["evidence"]["reachable"] == str(
+        reply.offer_unit_price
+    )
 
 
 def test_every_desk_message_carries_a_rationale(
