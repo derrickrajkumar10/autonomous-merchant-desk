@@ -46,7 +46,13 @@ SPINE = ("audit", "identity", "mandate", "spend", "freshness", "spine")
 #: - ``catalogue`` -- costs, prices and margin arithmetic (ticket 07). It runs *after*
 #:   the spine has finished, on a request the four checks already accepted, and it
 #:   decides what a deal is worth rather than whether it is allowed.
-NOT_THE_SPINE = ("catalogue",)
+#: - ``negotiation`` -- levers, the fixed policy and the closed mandate (ticket 08). It
+#:   runs after the spine too, and its own suite asserts the property that matters here:
+#:   nothing it does is probabilistic either. Ticket 21 makes the lever choice learned,
+#:   at which point that stops being true of one object inside it -- which is exactly why
+#:   the choice sits behind a substitutable one, and why this package is not on the list
+#:   above.
+NOT_THE_SPINE = ("catalogue", "negotiation")
 
 #: Found through the installed package rather than through the working directory, so
 #: that this reads the ``desk`` the tests actually import.
