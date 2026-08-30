@@ -37,19 +37,31 @@ from desk.identity.jws import (
     read_header,
     verify_request,
 )
-from desk.identity.keys import AGENT_ID_PREFIX, AgentPublicKey, PrincipalPublicKey
+from desk.identity.keys import (
+    AGENT_ID_PREFIX,
+    AgentPublicKey,
+    DeskPublicKey,
+    ES256PublicKey,
+    PrincipalPublicKey,
+)
 from desk.identity.principals import Principal, PrincipalConflict, PrincipalDirectory
 from desk.identity.registry import AgentIdentity, AgentRegistry, RegistrationConflict
 from desk.identity.schema import install_schema
+from desk.identity.signing import DESK_ALG, DESK_KEY_ID, DeskKeypair
 
 __all__ = [
     "AGENT_ID_PREFIX",
     "AGENT_REQUEST_ALG",
     "AGENT_REQUEST_TYP",
+    "DESK_ALG",
+    "DESK_KEY_ID",
     "UNIDENTIFIED_AGENT",
     "AgentIdentity",
     "AgentPublicKey",
     "AgentRegistry",
+    "DeskKeypair",
+    "DeskPublicKey",
+    "ES256PublicKey",
     "IdentityCheck",
     "IdentityOutcome",
     "Principal",

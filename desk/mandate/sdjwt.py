@@ -56,7 +56,7 @@ from jwt.api_jws import get_unverified_header
 from jwt.exceptions import PyJWTError
 from jwt.utils import base64url_decode, base64url_encode
 
-from desk.identity import PrincipalPublicKey
+from desk.identity import ES256PublicKey
 
 #: ES256 for mandates. Ed25519 everywhere else (ADR-0002): AP2's SDK is ES256-only,
 #: and a mandate is the one artefact a stranger's library has to read.
@@ -157,8 +157,15 @@ class Presentation:
     mandate_id: MandateDigest
 
 
-def verify_presentation(mandate: str, public_key: PrincipalPublicKey) -> Presentation:
+def verify_presentation(mandate: str, public_key: ES256PublicKey) -> Presentation:
     """The claims this mandate proves, with every disclosure resolved into place.
+
+    The key is taken as a capability rather than as a role. A mandate the principal
+    signed and one the Desk signed are read by the same RFC 9901 machinery, and
+    making that explicit is what keeps ``PrincipalPublicKey`` and ``DeskPublicKey``
+    two unrelated types everywhere it matters -- there is still no path by which a
+    mandate presented as a principal's verifies against the Desk's own key, because
+    the caller supplies the key and check 2 only ever resolves a principal's.
 
     Refuses rather than returns whenever the answer would be partly guessed: a
     signature that does not verify, a hash we do not implement, a disclosure that
@@ -180,7 +187,7 @@ def verify_presentation(mandate: str, public_key: PrincipalPublicKey) -> Present
         signed = jws_decode(issuer_jws, key=public_key.verifier(), algorithms=[MANDATE_ALG])
     except PyJWTError as exc:
         raise MandateNotVerified(
-            f"the mandate does not verify against the principal's registered key: {exc}"
+            f"the mandate does not verify against the key it was presented under: {exc}"
         ) from exc
 
     try:
@@ -199,7 +206,7 @@ def verify_presentation(mandate: str, public_key: PrincipalPublicKey) -> Present
     )
 
 
-def verify_sd_jwt(mandate: str, public_key: PrincipalPublicKey) -> dict[str, Any]:
+def verify_sd_jwt(mandate: str, public_key: ES256PublicKey) -> dict[str, Any]:
     """The claims ``verify_presentation`` proves, for a caller with no use for a digest."""
     return verify_presentation(mandate, public_key).claims
 
