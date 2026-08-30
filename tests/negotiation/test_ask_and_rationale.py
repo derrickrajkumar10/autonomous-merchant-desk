@@ -116,6 +116,39 @@ def test_the_lever_is_recorded_when_one_was_offered() -> None:
     assert "offering a bundle" in str(rationale)
 
 
+def test_a_rationale_carries_a_verdict_on_the_ask_as_well_as_on_the_offer() -> None:
+    """The pair a counter-offer is made of: yours does not hold, this one does."""
+    rationale = Rationale(
+        asked="10% off, 1 x SKU-GRINDER-BURR",
+        margin=_margin_on_grinder("0"),
+        on_the_ask=_margin_on_grinder("0.10"),
+    )
+
+    payload = rationale.as_payload()
+
+    assert payload["inside_floor"] is True
+    assert payload["ask_inside_floor"] is False
+    assert payload["ask_surplus"] == "-38.1750"
+    assert "would earn -38.1750" in str(rationale)
+
+
+def test_a_rationale_about_one_deal_does_not_state_it_twice() -> None:
+    """On a walk-away the deal refused and the deal reported are the same deal."""
+    refused = _margin_on_grinder("0.10")
+
+    rationale = Rationale(asked="10% off", margin=refused, on_the_ask=refused)
+
+    assert rationale.as_payload()["ask_inside_floor"] is False
+    assert "would earn" not in str(rationale)
+
+
+def test_an_ask_with_no_price_gets_no_verdict_about_one() -> None:
+    rationale = Rationale(asked="a price", margin=_margin_on_grinder("0"))
+
+    assert rationale.as_payload()["ask_inside_floor"] is None
+    assert rationale.as_payload()["ask_surplus"] is None
+
+
 def test_the_one_line_says_what_was_asked_and_where_the_margin_landed() -> None:
     """The line a viewer reads beside the speech bubble."""
     line = str(Rationale(asked="10% off", margin=_margin_on_grinder("0.10")))

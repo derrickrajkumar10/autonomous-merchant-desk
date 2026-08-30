@@ -30,7 +30,9 @@ from desk.negotiation import (
     Move,
     Negotiation,
     NegotiationOver,
+    NotWhatWasAuthorised,
     Payment,
+    Terms,
     TrustTier,
 )
 from desk.spend import Money
@@ -191,7 +193,7 @@ def test_the_desk_declines_a_discount_and_offers_a_bundle_in_the_same_message(
 
     assert reply.move is Move.COUNTER
     assert reply.lever is Lever.BUNDLE
-    assert reply.offer_unit_price == GRINDER.discounted("0.10")
+    assert reply.unit_price == GRINDER.discounted("0.10")
     assert reply.rationale.inside_floor
 
     offered = negotiation_entries(trail)[0].payload["evidence"]["offered"]
@@ -217,7 +219,7 @@ def test_a_bundle_is_never_built_from_something_the_principal_did_not_authorise(
     )
 
     assert reply.lever is not Lever.BUNDLE
-    assert reply.offer_unit_price > GRINDER.discounted("0.10")
+    assert reply.unit_price > GRINDER.discounted("0.10")
 
 
 def test_a_buyer_far_below_the_floor_is_walked_away_from_as_a_success(
@@ -273,8 +275,14 @@ def test_a_walk_away_reports_the_margin_on_the_deal_it_refused(
     assert payload["inside_floor"] is False
     assert Decimal(payload["surplus"]) < 0
     assert payload["lever"] is None
+
+    # The message is about the refused deal, and the closest the Desk could have got
+    # rides beside it rather than standing in for it.
+    assert reply.unit_price == rupees("300.00")
+    assert reply.reachable is not None
+    assert reply.reachable > reply.unit_price
     assert negotiation_entries(trail)[0].payload["evidence"]["reachable"] == str(
-        reply.offer_unit_price
+        reply.reachable
     )
 
 
@@ -304,6 +312,8 @@ def test_every_desk_message_carries_a_rationale(
         rationale = entry.payload["evidence"]["rationale"]
         assert set(rationale) == {
             "asked",
+            "ask_inside_floor",
+            "ask_surplus",
             "margin",
             "floor",
             "revenue",
@@ -425,7 +435,7 @@ def test_a_buyer_can_accept_the_offer_on_the_table(
     closed = deal.accept()
 
     assert closed.move is Move.ACCEPT
-    assert closed.offer_unit_price == counter.offer_unit_price
+    assert closed.unit_price == counter.unit_price
     assert closed.terms.delivery is Delivery.EXPRESS
     assert closed.closed_mandate is not None
 
@@ -529,14 +539,14 @@ def test_the_same_request_gets_a_different_answer_on_two_products(
     assert reply_dear.move is Move.WALK_AWAY
 
 
-def test_prepayment_and_speed_reach_a_price_that_neither_reaches_alone(
+def test_prepayment_reaches_a_price_the_same_ask_does_not_reach_without_it(
     spine: TrustSpine,
     selling: Desk,
     wallet: PrincipalKeypair,
     agent: AgentKeypair,
     identity: AgentIdentity,
 ) -> None:
-    """Each lever pays for the concession in a different currency, and both are real."""
+    """Money that arrives sooner costs less to carry, and the saving is the concession."""
     plain = opened(spine, selling, wallet, agent, identity)
     prepaid = opened(spine, selling, wallet, agent, identity)
 
@@ -545,6 +555,135 @@ def test_prepayment_and_speed_reach_a_price_that_neither_reaches_alone(
         Ask(sku=COFFEE.sku, quantity=1, target_unit_price=rupees("640.00"), can_prepay=True)
     )
 
-    assert with_terms.offer_unit_price < without.offer_unit_price
+    assert with_terms.unit_price < without.unit_price
     assert with_terms.terms.payment is Payment.PREPAID
     assert without.terms.payment is Payment.ON_DELIVERY
+
+
+def test_the_desk_reaches_for_one_lever_and_not_two(
+    spine: TrustSpine,
+    selling: Desk,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """A buyer who unlocks every lever still gets exactly one, and the terms say so.
+
+    Not a limitation but a decision, and it is the spec's: the levers are a closed set
+    "so that the later policy work has a fixed action space to choose over". Four
+    arrangements the bandit chooses between, not sixteen combinations of them.
+    """
+    deal = opened(spine, selling, wallet, agent, identity)
+
+    reply = deal.receive(
+        Ask(
+            sku=COFFEE.sku,
+            quantity=1,
+            target_unit_price=rupees("600.00"),
+            largest_quantity=8,
+            wants_delivery=Delivery.EXPRESS,
+            can_prepay=True,
+        )
+    )
+
+    assert reply.lever is not None
+    moved = [
+        reply.terms.delivery is not Terms().delivery,
+        reply.terms.payment is not Terms().payment,
+        reply.quantity != 1,
+        len(reply.rationale.margin.lines) > 1,
+    ]
+    assert sum(moved) == 1, "exactly one thing about the deal's shape moved"
+
+
+def test_a_counter_records_that_what_was_asked_for_did_not_hold(
+    spine: TrustSpine,
+    selling: Desk,
+    trail: AuditTrail,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """Two verdicts on one message, and the pair is the whole of what a counter says.
+
+    Reporting only that the Desk's own offer holds would put ``inside_floor: true`` on a
+    message that had just declined a below-floor request -- true, and an answer to a
+    question nobody asked.
+    """
+    deal = opened(spine, selling, wallet, agent, identity)
+
+    reply = deal.receive(Ask(sku=COFFEE.sku, quantity=1, target_unit_price=rupees("650.00")))
+
+    assert reply.move is Move.COUNTER
+    rationale = reply.rationale.as_payload()
+    assert rationale["inside_floor"] is True
+    assert rationale["ask_inside_floor"] is False
+    assert Decimal(rationale["ask_surplus"]) < 0
+    assert negotiation_entries(trail)[0].payload["evidence"]["rationale"] == rationale
+
+
+def test_an_opening_ask_that_names_no_price_has_no_verdict_about_one(
+    spine: TrustSpine,
+    selling: Desk,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """There is no proposed deal to be inside or outside a floor, and none is invented."""
+    deal = opened(spine, selling, wallet, agent, identity)
+
+    reply = deal.receive(Ask(sku=COFFEE.sku, quantity=1))
+
+    assert reply.rationale.as_payload()["ask_inside_floor"] is None
+    assert reply.rationale.as_payload()["ask_surplus"] is None
+
+
+def test_an_ask_for_something_else_is_not_negotiated(
+    spine: TrustSpine,
+    selling: Desk,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """The four checks gate every message, not only the first one of a conversation.
+
+    Check 3 authorised *this item*. Nothing has evaluated a laptop against the mandate,
+    the ceiling or the freshness window, so a price agreed for one here would be a
+    commitment the trust spine never saw.
+    """
+    deal = opened(spine, selling, wallet, agent, identity, sku=COFFEE.sku)
+
+    with pytest.raises(NotWhatWasAuthorised, match="different request"):
+        deal.receive(Ask(sku=LAPTOP.sku, quantity=1, target_unit_price=rupees("60000.00")))
+
+
+def test_accepting_the_offer_still_records_what_the_buyer_asked_for(
+    spine: TrustSpine,
+    selling: Desk,
+    trail: AuditTrail,
+    wallet: PrincipalKeypair,
+    agent: AgentKeypair,
+    identity: AgentIdentity,
+) -> None:
+    """FR-6.1 wants the stated constraints on every negotiation, not on most of them.
+
+    A buyer that says yes to the offer on the table sends no ask, so the closing entry
+    would otherwise carry none -- and a batch runner reading closed deals would be
+    reading the field it needs as empty on exactly the deals that worked.
+    """
+    deal = opened(spine, selling, wallet, agent, identity)
+    deal.receive(
+        Ask(
+            sku=COFFEE.sku,
+            quantity=1,
+            target_unit_price=rupees("650.00"),
+            largest_quantity=5,
+        )
+    )
+
+    deal.accept()
+
+    closing = negotiation_entries(trail)[-1]
+    assert closing.event_type is EventType.DEAL_CLOSED
+    assert closing.payload["evidence"]["stated"]["largest_quantity"] == 5
+    assert closing.payload["evidence"]["stated"]["target_unit_price"] == "650.00 INR"

@@ -30,7 +30,7 @@ outer closed mandate, using the key the open mandate bound in ``cnf``
 (``docs/ap2/specification.md:178-190``). Here the Desk signs both layers. The reason is
 that a negotiation is a conversation, not a form: the Desk has to be able to say what it
 agreed to whether or not the counterparty comes back to counter-sign, and the buyer's
-acceptance is already in the trail. A stranger's client counter-signing the envelope is
+acceptance is already in the trail. A buyer agent counter-signing the envelope is
 ticket 30's, and the shape is ready for it -- the inner document is unchanged by a
 second signature over the outer one. Until then, a closed mandate here proves what *the
 Desk* committed to and does not prove the buyer agreed. Reading it as both would be the

@@ -35,13 +35,16 @@ def _said(reply: DeskMessage) -> str:
     """One Desk message, as two lines.
 
     The margin half of the rationale rather than the whole of it: what was asked is the
-    heading above each exchange, and repeating it on every line would push the numbers
-    off the side of the page. The full one-liner names the ask too -- see
-    ``Rationale.__str__``.
+    heading above each exchange, and repeating it on every line would push the numbers off
+    the side of the page. The full one-liner names the ask too -- see ``Rationale.__str__``.
+
+    A walk-away prints the price it refused and, beside it, the closest the Desk could
+    have got. Those are two different numbers and the record keeps them apart.
     """
     lever = "" if reply.lever is None else f" [{reply.lever.value}]"
+    closest = "" if reply.reachable is None else f" (closest: {reply.reachable})"
     return (
-        f"  {reply.move.value:<10} {reply.offer_unit_price} x{reply.quantity}{lever}\n"
+        f"  {reply.move.value:<10} {reply.unit_price} x{reply.quantity}{lever}{closest}\n"
         f"             {reply.rationale.margin}"
     )
 
@@ -153,5 +156,5 @@ Ten percent off the grinder, alone and then with coffee authorised:
 
 A buyer offering 300 for a kilo of coffee:
 
-  walk_away  695.66 INR x1
+  walk_away  300.00 INR x1 (closest: 695.66 INR)
              margin -61.0000% on 300.00 INR revenue, floor 30.0000%, short by 273.0000 INR"""

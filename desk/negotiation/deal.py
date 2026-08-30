@@ -11,6 +11,13 @@ check 3's. Nothing here re-reads a mandate or believes a field a counterparty se
 its own authority. An outcome that did not pass is a caller's mistake and raises, in the
 same spirit as check 3 refusing to evaluate against an unverified mandate.
 
+**A negotiation is about one item, fixed when it opens.** Check 3 evaluated the
+request against the mandate and authorised *that item*, and nothing has evaluated
+anything else. So an ask naming a different sku is refused here rather than negotiated:
+it is not a bargaining position, it is a different request, and a different request goes
+through the front door. Without this the four checks would gate only the first message of
+a conversation, and the rest would be unexamined.
+
 **A round carries no new authority, so it presents no new mandate.** The buyer proved
 who it was, and that a human authorised this category of purchase, once -- at the front
 door. Haggling does not need proving again, and re-presenting the mandates every round
@@ -45,7 +52,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from desk.audit import AuditEntry, AuditTrail, EventType, ReasonCode
-from desk.catalogue import Catalogue, Margin, Product, UnknownProduct
+from desk.catalogue import Catalogue, Product
 from desk.identity import AgentIdentity, DeskKeypair
 from desk.mandate import AgreedCharge, AgreedItem, Checkout, close_checkout
 from desk.negotiation.ask import Ask
@@ -62,6 +69,16 @@ from desk.spine import SpineOutcome
 #: enough that a counterparty which never moves finds out quickly. The bound is here
 #: rather than in the policy because it is about the conversation, not the deal.
 ROUNDS = 6
+
+
+class NotWhatWasAuthorised(ValueError):
+    """An ask for something other than the item this negotiation was opened for.
+
+    Raised rather than answered, because there is no honest answer. The Desk could
+    negotiate a price for it, but nothing has checked that a human authorised it, that it
+    is inside a ceiling, or that the request is fresh -- and a price agreed on that basis
+    would be a commitment the trust spine never saw.
+    """
 
 
 class NegotiationOver(RuntimeError):
@@ -82,16 +99,19 @@ class DeskMessage:
     """
 
     move: Move
-    #: On an acceptance or a counter, the price on the table. On a walk-away, the closest
-    #: the Desk could have got -- which is not an offer, and is here so a reader can see
-    #: how far apart the two parties were.
-    offer_unit_price: Money
+    #: The unit price this message is about: what was agreed, what is being offered, or
+    #: what was refused.
+    unit_price: Money
     quantity: int
     terms: Terms
     lever: Lever | None
     rationale: Rationale
     entry: AuditEntry
     closed_mandate: str | None = None
+    #: On a walk-away, the least the Desk could have charged in some arrangement it had
+    #: available -- ``None`` when there was no such price at all. Absent everywhere else,
+    #: where the price on the table is already the answer.
+    reachable: Money | None = None
 
     @property
     def closed(self) -> bool:
@@ -143,6 +163,7 @@ class Desk:
         assert mandate is not None and mandate_id is not None, (
             "a passed check-2 outcome carries its mandate and the digest naming it"
         )
+        assert outcome.request is not None, "a passed outcome carries the request it read"
         return Negotiation(
             catalogue=self._catalogue,
             sheet=self._sheet,
@@ -151,6 +172,7 @@ class Desk:
             policy=self._policy,
             rounds=self._rounds,
             identity=outcome.identity,
+            item_id=outcome.request.item_id,
             authorised=mandate.authorised_item_ids(),
             # ``mandate_id`` and not ``digest``: the closed mandate names the open one
             # for ever, and a digest that varied with which disclosures a holder chose to
@@ -174,6 +196,7 @@ class Negotiation:
         policy: Policy,
         rounds: int,
         identity: AgentIdentity,
+        item_id: str,
         authorised: tuple[str, ...],
         open_checkout: str,
         tier: TrustTier,
@@ -185,11 +208,13 @@ class Negotiation:
         self._policy = policy
         self._rounds = rounds
         self._identity = identity
+        self._item_id = item_id
         self._authorised = authorised
         self._open_checkout = open_checkout
         self._tier = tier
         self._round = 0
         self._standing: Proposal | None = None
+        self._last_ask: Ask | None = None
         self._over = False
 
     @property
@@ -205,8 +230,15 @@ class Negotiation:
         """Answer one buyer message. Every answer is recorded, whatever it says."""
         if self._over:
             raise NegotiationOver("this negotiation has already ended")
+        if ask.sku != self._item_id:
+            raise NotWhatWasAuthorised(
+                f"this negotiation is about {self._item_id}, and check 3 authorised that; "
+                f"an ask for {ask.sku} is a different request and goes through the four "
+                f"checks like any other"
+            )
 
         self._round += 1
+        self._last_ask = ask
         position = self._position(ask)
         proposal = self._policy.propose(position)
 
@@ -255,14 +287,17 @@ class Negotiation:
         return self._close(None, self._standing)
 
     def _position(self, ask: Ask) -> Position:
-        """What the policy is allowed to see, assembled from verified sources only."""
-        try:
-            product = self._catalogue.product(ask.sku)
-        except UnknownProduct:
-            raise
+        """What the policy is allowed to see, assembled from verified sources only.
+
+        ``Catalogue.product`` raises ``UnknownProduct`` for a sku the Desk does not sell,
+        and that is left to propagate. A mandate may authorise something this merchant has
+        never stocked -- a principal writes what they want, not what we happen to have --
+        and there is no price to negotiate for a thing with no cost behind it. It is a
+        gap in the catalogue rather than anything a counterparty did.
+        """
         return Position(
             ask=ask,
-            product=product,
+            product=self._catalogue.product(ask.sku),
             companions=self._companions(ask.sku),
             sheet=self._sheet,
             tier=self._tier,
@@ -287,7 +322,7 @@ class Negotiation:
     def _close(self, ask: Ask | None, proposal: Proposal) -> DeskMessage:
         """Agreement: sign what was agreed, record it, and end the negotiation."""
         self._over = True
-        rationale = _rationale(ask, proposal, lever=proposal.lever)
+        rationale = _rationale(ask, proposal)
         agreed_at = datetime.now(UTC)
         mandate = close_checkout(
             Checkout(
@@ -324,16 +359,7 @@ class Negotiation:
             ),
             state_change={"deal": "closed"},
         )
-        return DeskMessage(
-            move=Move.ACCEPT,
-            offer_unit_price=proposal.unit_price,
-            quantity=proposal.offer.lines[0].quantity,
-            terms=proposal.terms,
-            lever=proposal.lever,
-            rationale=rationale,
-            entry=entry,
-            closed_mandate=mandate,
-        )
+        return _message(Move.ACCEPT, proposal, rationale, entry, closed_mandate=mandate)
 
     def _counter(self, ask: Ask, proposal: Proposal) -> DeskMessage:
         """A counter-offer, and the lever entry beside it when one was offered.
@@ -342,7 +368,7 @@ class Negotiation:
         is what the metrics count and what ticket 21 learns from -- and reading it out of a
         message payload would make "how often did the Desk bundle" a query over free text.
         """
-        rationale = _rationale(ask, proposal, lever=proposal.lever)
+        rationale = _rationale(ask, proposal)
         entry = self._record(
             EventType.NEGOTIATION_MESSAGE_SENT,
             reason_code=None,
@@ -362,36 +388,17 @@ class Negotiation:
                 proposal=proposal,
                 rationale=rationale,
                 reasoning=(
-                    f"a straight concession on price does not hold, so the Desk offered a "
+                    f"a straight cut in price does not hold, so the Desk offered a "
                     f"{proposal.lever.value.replace('_', ' ')} instead"
                 ),
                 state_change={"lever": proposal.lever.value},
             )
-        return DeskMessage(
-            move=Move.COUNTER,
-            offer_unit_price=proposal.unit_price,
-            quantity=proposal.offer.lines[0].quantity,
-            terms=proposal.terms,
-            lever=proposal.lever,
-            rationale=rationale,
-            entry=entry,
-        )
+        return _message(Move.COUNTER, proposal, rationale, entry)
 
     def _walk(self, ask: Ask, proposal: Proposal, *, reasoning: str) -> DeskMessage:
         """A walk-away, recorded as the completed negotiation it is."""
         self._over = True
-        # A walk-away's rationale is about the deal that was *refused* and not about the
-        # one the Desk could have reached. ``below_margin_floor`` is a statement about the
-        # buyer's number, and reporting the Desk's own reachable margin here would record
-        # a walk-away as sitting comfortably inside its floor -- true of a deal that never
-        # happened, and the opposite of an explanation.
-        #
-        # And no lever, for the same reason: the proposal carries the best arrangement
-        # available, which is worth having in the evidence, but nothing was put on the
-        # table and a rationale naming a lever would say something that did not happen.
-        rationale = _rationale(
-            ask, proposal, lever=None, margin=proposal.asked_margin or proposal.margin
-        )
+        rationale = _rationale(ask, proposal)
         entry = self._record(
             EventType.WALKED_AWAY,
             reason_code=ReasonCode.BELOW_MARGIN_FLOOR,
@@ -403,15 +410,7 @@ class Negotiation:
             # outcome; the outcome is that no deal was worth doing.
             state_change={"deal": "walked away"},
         )
-        return DeskMessage(
-            move=Move.WALK_AWAY,
-            offer_unit_price=proposal.unit_price,
-            quantity=proposal.offer.lines[0].quantity,
-            terms=proposal.terms,
-            lever=proposal.lever,
-            rationale=rationale,
-            entry=entry,
-        )
+        return _message(Move.WALK_AWAY, proposal, rationale, entry)
 
     def _record(
         self,
@@ -442,14 +441,20 @@ class Negotiation:
                 "evidence": {
                     "product": proposal.offer.lines[0].product.sku,
                     "trust_tier": self._tier.value,
-                    "stated": None if ask is None else ask.stated(),
+                    # The last ask rather than this message's, because a buyer accepting
+                    # the offer on the table sends no ask at all -- and FR-6.1 asks for
+                    # the buyer's stated constraints on every negotiation, which a closing
+                    # entry carrying none would not have.
+                    "stated": None if self._last_ask is None else self._last_ask.stated(),
                     "offered": {
                         "unit_price": str(proposal.unit_price),
                         "quantity": proposal.offer.lines[0].quantity,
                         "terms": proposal.terms.as_claims(),
                         "bundled": [line.product.sku for line in proposal.offer.lines[1:]],
                     },
-                    "reachable": str(proposal.unit_price),
+                    "reachable": (
+                        None if proposal.reachable is None else str(proposal.reachable)
+                    ),
                     "rationale": rationale.as_payload(),
                 },
                 "state_change": state_change,
@@ -457,14 +462,35 @@ class Negotiation:
         )
 
 
-def _rationale(
-    ask: Ask | None,
+def _message(
+    move: Move,
     proposal: Proposal,
+    rationale: Rationale,
+    entry: AuditEntry,
     *,
-    lever: Lever | None,
-    margin: Margin | None = None,
-) -> Rationale:
-    """The FR-5.4 object for one message: what was asked, and where the margin landed."""
+    closed_mandate: str | None = None,
+) -> DeskMessage:
+    """One reply, read off the proposal it came from so the two cannot drift apart."""
+    return DeskMessage(
+        move=move,
+        unit_price=proposal.unit_price,
+        quantity=proposal.offer.lines[0].quantity,
+        terms=proposal.terms,
+        lever=proposal.lever,
+        rationale=rationale,
+        entry=entry,
+        closed_mandate=closed_mandate,
+        reachable=proposal.reachable,
+    )
+
+
+def _rationale(ask: Ask | None, proposal: Proposal) -> Rationale:
+    """The FR-5.4 object for one message: what was asked, and where the margin landed.
+
+    ``margin`` is the proposal's own, which is the deal the message is about in all three
+    cases -- ``policy.py`` is where that is arranged, and a walk-away's proposal carries
+    the refused deal rather than the one the Desk could have reached.
+    """
     if ask is None:
         asked = "the offer on the table"
     elif ask.target_unit_price is None:
@@ -472,5 +498,8 @@ def _rationale(
     else:
         asked = f"{ask.target_unit_price} each for {ask.quantity} x {ask.sku}"
     return Rationale(
-        asked=asked, margin=proposal.margin if margin is None else margin, lever=lever
+        asked=asked,
+        margin=proposal.margin,
+        on_the_ask=proposal.asked_margin,
+        lever=proposal.lever,
     )

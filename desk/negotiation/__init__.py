@@ -16,7 +16,7 @@ Four ideas, and the last two are the ones that make it more than a haggling loop
 **The floor is never crossed.** Every offer the Desk puts forward is tested by
 ``margin_on`` before it is sent, and an offer that does not hold is never sent. There is
 no path here that reaches agreement on an offer the floor refused -- not a lenient
-branch, not a rounding, not a special case for a good customer.
+branch, not a rounding, not a special case for a well-behaved agent.
 
 **A refusal is not the end of the conversation.** The Desk can decline a discount and
 offer a bundle in the same message (FR-5.3), which is the difference between a merchant
@@ -59,6 +59,7 @@ from desk.negotiation.deal import (
     DeskMessage,
     Negotiation,
     NegotiationOver,
+    NotWhatWasAuthorised,
 )
 from desk.negotiation.lever import CONSIDERED, Lever
 from desk.negotiation.policy import (
@@ -70,6 +71,7 @@ from desk.negotiation.policy import (
     PriceUnreachable,
     Proposal,
     Shape,
+    UnknownLever,
 )
 from desk.negotiation.rationale import Rationale
 from desk.negotiation.terms import (
@@ -99,6 +101,7 @@ __all__ = [
     "Move",
     "Negotiation",
     "NegotiationOver",
+    "NotWhatWasAuthorised",
     "Payment",
     "Policy",
     "Position",
@@ -109,4 +112,5 @@ __all__ = [
     "Terms",
     "TermsSheet",
     "TrustTier",
+    "UnknownLever",
 ]

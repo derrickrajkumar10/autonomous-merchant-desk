@@ -336,7 +336,7 @@ bundle, in one test.
 
 **Counts, actually run:** 58 tests in `tests/catalogue/`, and 5 added to
 `tests/spend/test_money.py` for the one thing `Money` was missing — a unit price times
-a quantity. 401 in the suite as a whole, plus one skipped (the AP2 conformance test,
+a quantity. 406 in the suite as a whole, plus one skipped (the AP2 conformance test,
 which needs the throwaway environment `pyproject.toml` describes).
 
 Eight of those 58 arrived after this ticket: `test_charge.py`, added by ticket 08 along

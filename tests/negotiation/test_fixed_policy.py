@@ -12,10 +12,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-import pytest
-
 from desk.catalogue import Line, Offer, Product, margin_on
 from desk.negotiation import (
+    CONSIDERED,
     REACH,
     Ask,
     Delivery,
@@ -258,12 +257,19 @@ def test_every_proposal_holds_or_is_a_walk_away() -> None:
                 assert proposal.margin.inside_floor, f"{product.sku} at {tenth} tenths off"
 
 
-@pytest.mark.parametrize("lever", list(Lever))
-def test_the_action_space_is_four_wide(lever: Lever) -> None:
-    """A guard on the closed set: adding a member without meaning to should be noticed."""
-    assert lever.value in {
-        "quantity_break",
+def test_the_action_space_is_exactly_these_four() -> None:
+    """A guard on the closed set, in both directions.
+
+    Ticket 21 learns over this set, and a member added or removed halfway through makes
+    everything learned before the change incomparable with everything after. Both halves
+    matter: a missing lever is as much a change to the action space as an extra one, and
+    `CONSIDERED` has to name every member or `_shape` raises.
+    """
+    assert {lever.value for lever in Lever} == {
         "bundle",
+        "quantity_break",
         "delivery_speed",
         "payment_terms",
     }
+    assert set(CONSIDERED) == set(Lever)
+    assert len(CONSIDERED) == len(Lever)

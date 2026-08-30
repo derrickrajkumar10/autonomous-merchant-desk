@@ -143,14 +143,21 @@ class Position:
 class Proposal:
     """What the policy decided, and the offer it decided about.
 
-    An offer is present on a walk-away too -- the best arrangement the Desk could have
-    made, so that a reader can see how far apart the two parties actually were rather
-    than only that they were apart.
+``offer`` is always the deal the message is *about*: what was agreed on an
+    acceptance, what is being put forward on a counter, and what was refused on a
+    walk-away. So its margin is always the number the rationale should report, and a
+    walk-away reads as the refusal it is rather than as a comfortable profit on a sale
+    that never happened.
 
-    ``asked_margin`` is the other half of that, and it is the one a walk-away is
-    *about*: the margin on the deal the buyer actually proposed, which is the thing
-    sitting under the floor. Absent when the buyer named no price, because there is then
-    no proposed deal for it to be the margin of.
+    ``reachable`` is the other half of a walk-away: the least the Desk could have charged
+    in some available arrangement. It is deliberately ``None`` when there was no such
+    price -- an arrangement that does not hold at *any* price the Desk would name has no
+    reachable price, and recording the list price as one would be recording a number the
+    code has just established does not clear the floor.
+
+    ``asked_margin`` is the margin the buyer's own price would have earned, carried on
+    every answer that had a price to reason about. On a walk-away it is ``offer``'s own
+    margin, because there the deal the message is about is the one that was asked for.
     """
 
     move: Move
@@ -159,6 +166,7 @@ class Proposal:
     lever: Lever | None
     unit_price: Money
     asked_margin: Margin | None = None
+    reachable: Money | None = None
 
     @property
     def margin(self) -> Margin:
@@ -207,25 +215,27 @@ class FixedPolicy:
         # Nothing reaches the buyer's number. Find the closest the Desk can get.
         best = _best(position, shapes)
         if best is None:
-            # No arrangement holds at any price the Desk would name. Nothing to discuss.
-            return _proposal(
-                Move.WALK_AWAY,
-                position,
-                plain,
-                position.product.list_price,
-                asked_margin=on_the_ask,
-            )
+            # No arrangement holds at any price the Desk would name, so there is no
+            # reachable price to record and none is invented.
+            return _walk_away(position, plain, asked, on_the_ask, reachable=None)
 
         shape, price = best
-        move = Move.WALK_AWAY if _out_of_reach(asked, price) else Move.COUNTER
-        return _proposal(move, position, shape, price, asked_margin=on_the_ask)
+        if _out_of_reach(asked, price):
+            return _walk_away(position, plain, asked, on_the_ask, reachable=price)
+        return _proposal(Move.COUNTER, position, shape, price, asked_margin=on_the_ask)
 
     def _quote(self, position: Position, plain: Shape) -> Proposal:
-        """List price on ordinary terms -- and a walk-away if even that does not hold."""
+        """List price on ordinary terms -- and a walk-away if even that does not hold.
+
+        The walk-away here records no reachable price, and that is the honest answer: if
+        the Desk cannot sell the thing at its own asking price on ordinary terms, there
+        is no price it could name that would.
+        """
         price = position.product.list_price
         offer = plain.offer(position.product, price, position.sheet)
-        move = Move.COUNTER if margin_on(offer).inside_floor else Move.WALK_AWAY
-        return _proposal(move, position, plain, price)
+        if margin_on(offer).inside_floor:
+            return _proposal(Move.COUNTER, position, plain, price)
+        return _proposal(Move.WALK_AWAY, position, plain, price, reachable=None)
 
 
 def _shapes(position: Position) -> tuple[Shape, ...]:
@@ -453,6 +463,34 @@ def _out_of_reach(asked: Money, best: Money) -> bool:
         return asked.amount < best.amount * (Decimal(1) - REACH)
 
 
+def _walk_away(
+    position: Position,
+    plain: Shape,
+    asked: Money,
+    on_the_ask: Margin,
+    *,
+    reachable: Money | None,
+) -> Proposal:
+    """A walk-away, carrying the deal it refused rather than the one it could have made.
+
+    The offer is the buyer's own price on ordinary terms, so ``below_margin_floor`` is a
+    statement about the thing it is a statement about. Where the Desk could have got to
+    rides beside it as ``reachable``, and is absent when it could not have got anywhere.
+
+    No lever, and the plain shape rather than the best one: nothing was put on the table,
+    so nothing about the arrangement the Desk would have used is a thing that happened.
+    """
+    return Proposal(
+        move=Move.WALK_AWAY,
+        offer=plain.offer(position.product, asked, position.sheet),
+        terms=plain.terms,
+        lever=None,
+        unit_price=asked,
+        asked_margin=on_the_ask,
+        reachable=reachable,
+    )
+
+
 def _proposal(
     move: Move,
     position: Position,
@@ -460,6 +498,7 @@ def _proposal(
     price: Money,
     *,
     asked_margin: Margin | None = None,
+    reachable: Money | None = None,
 ) -> Proposal:
     return Proposal(
         move=move,
@@ -468,4 +507,5 @@ def _proposal(
         lever=shape.lever,
         unit_price=price,
         asked_margin=asked_margin,
+        reachable=reachable,
     )

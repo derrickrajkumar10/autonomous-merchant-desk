@@ -59,7 +59,16 @@ class Delivery(StrEnum):
 
 
 class Payment(StrEnum):
-    """When the Desk gets its money."""
+    """When the Desk gets its money.
+
+    **Nothing in ticket 08 offers net-30.** Every lever moves toward the Desk being paid
+    *sooner*, because that is the direction that buys something; agreeing to wait longer
+    costs the Desk money and buys it nothing, so no arrangement reaches for it. It is a
+    member because it is the third payment term this merchant recognises, and because
+    ``TermsSheet`` refuses a sheet that cannot cost a term the Desk recognises -- one it
+    could say yes to and could not price is one it would agree to blind. A buyer that asks
+    for it needs a modelled buyer, which is ticket 19's.
+    """
 
     PREPAID = "prepaid"
     ON_DELIVERY = "on_delivery"

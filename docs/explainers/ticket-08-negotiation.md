@@ -23,7 +23,7 @@ bag. I can do it for five.* Or: *not on its own — but take the coffee with it 
 it.* Or: *if you pay today rather than at the end of the month, yes.*
 
 Notice what's going on in each of those. The shopkeeper is not giving anything away. They
-are **changing the shape of the deal** so that the price the customer wanted becomes a
+are **changing the shape of the deal** so that the price the buyer wanted becomes a
 price the shopkeeper can survive. Something goes in the other direction each time — more
 units, a second product, cash sooner.
 
@@ -191,7 +191,24 @@ everything.
 
 ---
 
-## 8. Every message explains itself
+## 8. One conversation is about one thing
+
+A negotiation is opened on a request that cleared all four checks, and check 3 authorised
+*that item* — it read the human's signed authorisation and confirmed the thing being
+bought was in it.
+
+Nothing has checked anything else. So an ask that names a different product part-way
+through a conversation is refused rather than negotiated. It is not a bargaining
+position; it is a different request, and a different request goes in through the front
+door like any other.
+
+The alternative is worse than it looks. Without this rule, the four checks would gate only
+the *first* message of a conversation and every message after it would be unexamined —
+which is a fairly elaborate way of not having checks.
+
+---
+
+## 9. Every message explains itself
 
 Each thing the Desk says carries a small machine-readable object beside it: what was
 asked, what the margin on the table is, what the floor asks for, how far apart those two
@@ -201,6 +218,12 @@ are, and which lever was offered.
 refusals — those are the ones that look like they need justifying. It is the wrong way
 round. The question somebody actually has, six months later, is *why did it agree to
 that*.
+
+**Two verdicts, not one.** A counter-offer is an answer to a question, so it records
+both halves: what the buyer asked for did *not* hold, and what the Desk is putting
+forward does. Recording only the second would put "inside the floor: yes" on a message
+that had just declined a below-floor request — true, and an answer to a question nobody
+asked.
 
 One consequence worth stating. The percentages in that object are rounded for a human to
 read; the decision was made on exact arithmetic that never divides. Occasionally the two
@@ -212,11 +235,14 @@ floor gets crossed by nobody's decision.
 A walk-away's explanation is about **the deal that was refused**, not about the best deal
 the Desk could have offered. That sounds obvious and it was got wrong first: reporting the
 Desk's own reachable margin made every walk-away read as comfortably profitable, which is
-true of a deal that never happened and is no explanation at all.
+true of a deal that never happened and is no explanation at all. How close the Desk could
+have got is recorded beside it as a separate number — and is *absent* rather than filled
+in when there was no reachable price at all, because writing down a price the code has
+just established does not work would be worse than writing nothing.
 
 ---
 
-## 9. Watching it happen
+## 10. Watching it happen
 
 Four conversations with one Desk, driven the way an outside buyer agent would drive them
 — real keys, real signed authorisations, through the same front door. This is the output
@@ -263,13 +289,14 @@ The counters land on numbers nobody would choose. 3324.33 is not a shopkeeper's 
 That is deliberate — it is the least the Desk can charge, worked out and then checked, and
 a rounder figure would be money left on the table in the buyer's direction.
 
-And the walk-away reports the buyer's own deal: minus sixty-one percent margin, 273 rupees
-short. Not the Desk's reachable 695.66, which would have read as a comfortable profit on a
-sale that did not happen.
+And the walk-away is about the buyer's own deal: 300 rupees a kilo, minus sixty-one
+percent margin, 273 rupees short. The 695.66 the Desk could have got to is beside it and
+clearly labelled as a different number — reported as the Desk's margin, it would have read
+as a comfortable profit on a sale that did not happen.
 
 ---
 
-## 10. What comes out of the end
+## 11. What comes out of the end
 
 When a negotiation closes, the Desk signs a **closed Checkout Mandate** — a document
 saying, in a form somebody else can check, exactly what was agreed: the items, the
@@ -297,7 +324,7 @@ the counter-signature is ticket 30's, and nothing here has to change for it.
 
 ---
 
-## 11. The vocabulary, now that you need it
+## 12. The vocabulary, now that you need it
 
 - **Desk** — our system. The merchant that sells to machines.
 - **Margin floor** — the least share of a sale that may be profit. A share, and
@@ -319,7 +346,7 @@ the counter-signature is ticket 30's, and nothing here has to change for it.
 
 ---
 
-## 12. How the price is actually found
+## 13. How the price is actually found
 
 This section is the arithmetic. Skip it if you have what you need.
 
@@ -363,7 +390,7 @@ conversations rather than about margin, and it is named and commented where it i
 
 ---
 
-## 13. Where the code lives
+## 14. Where the code lives
 
 ```
 desk/negotiation/lever.py       the four levers, and why the set is closed
@@ -396,7 +423,7 @@ learned policy is supposed to discover, which would make the comparison worthles
 
 ---
 
-## 14. What this ticket deliberately does not do
+## 15. What this ticket deliberately does not do
 
 - **It does not choose the best lever.** It reaches for the first workable one in a fixed
   order. Learning which is best over product, trust tier and stated constraints is
@@ -404,9 +431,16 @@ learned policy is supposed to discover, which would make the comparison worthles
 - **It does not take money.** Nothing settles, nothing is charged, no receipt is issued.
   Ticket 09. The closed mandate is what that ticket charges against.
 - **It does not compute the trust tier.** Ticket 12's ladder.
+- **It does not combine two levers.** A buyer that unlocks all four still gets exactly
+  one. That is a decision rather than a shortcut: ticket 21 learns over this action space
+  and the spec fixes it at four, so allowing combinations would make it sixteen and would
+  make everything learned before such a change incomparable with everything after.
 - **It does not model the buyer.** A reproducible, seeded definition of a counterparty —
   budget, patience, aggression, honesty — is ticket 19, and it is what makes two policies
-  comparable over identical deals. Until then a buyer is whatever the tests drive.
+  comparable over identical deals. The parent spec asked for negotiations to be driven by
+  seeded deal specs *here*, which is not possible in the order the tickets run: ticket 19
+  is blocked by this one. Until it lands, a buyer is whatever the tests drive, and the
+  determinism the comparison eventually needs is ticket 19's to establish.
 - **It does not inspect what the buyer wrote.** Check 5, the model-backed pass that reads
   message content for instructions aimed at the Desk, is ticket 10.
 - **It does not re-check authority per round.** Bargaining carries no new authority, so no
@@ -415,7 +449,7 @@ learned policy is supposed to discover, which would make the comparison worthles
 
 ---
 
-## 15. If you want to read the code
+## 16. If you want to read the code
 
 Start with `desk/negotiation/__init__.py` — four ideas, and the last two are the ones that
 make this more than a haggling loop. Then `policy.py` for the decision and `deal.py` for
@@ -428,11 +462,11 @@ metrics read, so a test reading it exercises the thing those two will.
 `test_fixed_policy.py` is the one place that talks to the policy directly, because that is
 the interface a learned policy will have to honour too.
 
-**Counts, actually run:** 61 tests in `tests/negotiation/`, 60 in `tests/mandate/` (up 13
-for the closed mandate), 58 in `tests/catalogue/` (up 8 for charges) and 43 in
-`tests/identity/` (up 7 for the Desk's key). 401 in the suite as a whole, plus one skipped
-— the AP2 conformance test, which needs the throwaway environment `pyproject.toml`
-describes.
+**Counts, actually run:** 66 tests in `tests/negotiation/`, 60 in `tests/mandate/`
+(13 of them the closed mandate's), 58 in `tests/catalogue/` (8 of them charges) and 43 in
+`tests/identity/` (7 of them the Desk's key). 406 in the suite as a whole, plus one
+skipped — the AP2 conformance test, which needs the throwaway environment
+`pyproject.toml` describes.
 
 Two existing files changed for good reasons. `tests/spine/test_no_model_call.py` refuses
 to let a new package appear under `desk/` without somebody stating whether it is part of

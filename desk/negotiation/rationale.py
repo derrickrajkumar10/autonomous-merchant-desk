@@ -11,6 +11,15 @@ record an account of when the Desk said no, and the question a reader actually h
 *why did it agree to that*. So an acceptance carries the same object as a walk-away, and
 the suite asserts it on all of them rather than on a sample.
 
+**Two verdicts, because a counter-offer is an answer to a question.** That the Desk's
+own offer holds is one fact; whether *what the buyer asked for* held is a different one,
+and it is the one FR-5.4 means by "whether it sits inside the floor". A counter that
+reported only the first would record ``inside_floor: true`` on a message that had just
+declined a below-floor request -- true, and an answer to a question nobody asked. So a
+rationale carries the margin on the deal the message is about and, whenever the buyer
+named a price, the verdict on that price beside it. On a walk-away the two are the same
+deal, and the line does not say it twice.
+
 **It reports and never decides.** The verdict is ``Margin.inside_floor``, computed by
 exact subtraction over the offer; the percentages here are the same numbers rounded for
 a human to read. A reader who compares the two rounded percentages will occasionally see
@@ -42,23 +51,40 @@ class Rationale:
     #: What the buyer asked for, in its own terms, so that the record of the answer
     #: carries the question. Short: this is a log line, not a transcript.
     asked: str
-    #: The margin on the offer the Desk is putting forward -- or, on a walk-away, on the
-    #: offer it would have had to make. Either way it is a real computation over a real
-    #: offer, never a placeholder.
+    #: The margin on the deal this message is about: the agreed deal on an acceptance,
+    #: the counter-offer on a counter, the refused deal on a walk-away. A real
+    #: computation over a real offer in every case, never a placeholder.
     margin: Margin
-    #: Which lever, if any. Absent on a message that conceded nothing but price, and on
-    #: one that conceded nothing at all.
+    #: The margin the buyer's own price would have earned, whenever it named one. On a
+    #: walk-away this is ``margin`` itself, because the deal the message is about *is*
+    #: the one that was asked for. ``None`` on an opening ask that named no price, where
+    #: there is no proposed deal to have a margin.
+    on_the_ask: Margin | None = None
+    #: Which lever, if any. Absent on a message that conceded nothing but price, on one
+    #: that conceded nothing at all, and on a walk-away, where nothing was offered.
     lever: Lever | None = None
 
     @property
     def inside_floor(self) -> bool:
-        """The verdict, taken from the offer rather than restated beside it."""
+        """Whether the deal this message is about holds. Read off the offer, not restated."""
         return self.margin.inside_floor
+
+    @property
+    def ask_inside_floor(self) -> bool | None:
+        """Whether what the buyer asked for held. ``None`` when it named no price.
+
+        On a counter this is ``False`` while ``inside_floor`` is ``True``, and the pair is
+        the whole of the message: *what you asked for does not hold, and here is something
+        that does.*
+        """
+        return None if self.on_the_ask is None else self.on_the_ask.inside_floor
 
     def as_payload(self) -> dict[str, Any]:
         """The rationale as the trail carries it, and as the control room reads it."""
         return {
             "asked": self.asked,
+            "ask_inside_floor": self.ask_inside_floor,
+            "ask_surplus": None if self.on_the_ask is None else str(self.on_the_ask.surplus),
             "margin": None if self.margin.rate is None else str(self.margin.rate),
             "floor": None if self.margin.floor is None else str(self.margin.floor),
             "revenue": str(self.margin.revenue),
@@ -70,4 +96,9 @@ class Rationale:
     def __str__(self) -> str:
         """One line, and ``Margin`` already knows how to say most of it."""
         lever = "" if self.lever is None else f", offering a {self.lever.value.replace('_', ' ')}"
-        return f"asked {self.asked}; {self.margin}{lever}"
+        declined = (
+            ""
+            if self.on_the_ask is None or self.on_the_ask is self.margin
+            else f" (which would earn {self.on_the_ask.surplus} against its floor)"
+        )
+        return f"asked {self.asked}{declined}; {self.margin}{lever}"
