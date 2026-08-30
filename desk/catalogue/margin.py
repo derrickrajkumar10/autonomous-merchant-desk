@@ -274,12 +274,12 @@ class Margin:
     @property
     def revenue(self) -> Money:
         """Everything the buyer pays: the goods, and whatever the terms charge for."""
-        return _total(part.revenue for part in self._parts)
+        return total(part.revenue for part in self._parts)
 
     @property
     def cost(self) -> Money:
         """Everything the deal costs the Desk: the goods, the courier, the handling."""
-        return _total(part.cost for part in self._parts)
+        return total(part.cost for part in self._parts)
 
     @property
     def _parts(self) -> tuple[LineMargin | ChargeMargin, ...]:
@@ -365,8 +365,13 @@ def margin_on(offer: Offer) -> Margin:
     )
 
 
-def _total(amounts: Iterable[Money]) -> Money:
-    """Add up money that is already known to be one currency."""
+def total(amounts: Iterable[Money]) -> Money:
+    """Add up money that is already known to be one currency.
+
+    Public because a negotiation adds up an offer's goods before the offer exists -- the
+    charges its terms put on it are computed *from* that total -- so it cannot ask a
+    ``Margin`` for the number and had grown its own copy of this loop.
+    """
     running: Money | None = None
     for amount in amounts:
         running = amount if running is None else running + amount

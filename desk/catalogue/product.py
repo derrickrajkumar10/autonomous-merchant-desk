@@ -36,13 +36,6 @@ from desk.spend import CurrencyMismatch, Money
 #: product whose id could not appear there is a product no mandate could authorise.
 SKU = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,62}[A-Z0-9]\Z")
 
-#: The coarsest scale a discounted price may be rounded to: whole units of the currency.
-#: A list price recorded more coarsely than that -- ``Decimal("1E+3")`` is a legitimate
-#: way to write one thousand -- must not drag the discount out to the nearest thousand
-#: with it. See ``Product.discounted``.
-_SMALLEST_SCALE = 0
-
-
 @dataclass(frozen=True)
 class Product:
     """One thing the Desk sells, priced so that a margin can be computed about it."""
@@ -144,12 +137,8 @@ class Product:
         this product is priced, which saves this module carrying a table of how many
         minor units each currency has.
 
-        The floor under that is why ``_SMALLEST_SCALE`` exists. ``Decimal`` keeps a
-        scale coarser than whole units too -- ``Decimal("1E+3")`` is one thousand
-        recorded to the nearest thousand -- and quantizing a discount to *that* would
-        round every price under 1,500 rupees to either the full list price or zero. A
-        discount silently becoming no discount is the worst failure this method has, so
-        the scale is clamped and never read straight off the price.
+There is a trap under that, and ``Money.scale`` sets it out: a scale
+        coarser than whole units would round a discount away entirely.
 
         **Which way it goes on a tie** is up. Half a paisa between two prices resolves
         toward the Desk, because a concession is something the Desk grants
@@ -176,13 +165,10 @@ class Product:
         )
 
     def price_scale(self) -> Decimal:
-        """How finely this product is priced: the list price's scale, or whole units.
+        """How finely this product is priced: its list price's own scale.
 
         Public because ``discounted`` is not the only thing that has to land a computed
-        price on a real amount. A negotiation works out the least it can charge and has
-        to round that the same way, or the two would disagree by a paisa and the
-        disagreement would be invisible until a deal closed a paisa under its floor.
+        price on a real amount. A negotiation works out the least it can charge and rounds
+        it the same way, through this.
         """
-        exponent = self.list_price.amount.as_tuple().exponent
-        assert isinstance(exponent, int), "a finite Decimal has an integer exponent"
-        return Decimal(1).scaleb(min(exponent, _SMALLEST_SCALE))
+        return self.list_price.scale()

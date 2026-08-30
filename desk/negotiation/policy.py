@@ -40,13 +40,13 @@ concedes at all.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, Decimal, localcontext
 from enum import StrEnum
 from typing import Protocol
 
-from desk.catalogue import Line, Margin, Offer, Product, margin_on
+from desk.catalogue import Line, Margin, Offer, Product, margin_on, total
 from desk.negotiation.ask import Ask
 from desk.negotiation.lever import CONSIDERED, Lever
 from desk.negotiation.terms import Delivery, Payment, Terms, TermsSheet
@@ -80,6 +80,15 @@ class PriceUnreachable(RuntimeError):
     """
 
 
+class UnknownLever(RuntimeError):
+    """A lever in ``CONSIDERED`` that no shape is built for.
+
+    Raised by the Desk against its own configuration, never by a counterparty. The set is
+    closed and adding to it is deliberate (``lever.py``); this is what makes "deliberate"
+    mean something at run time rather than only in a docstring.
+    """
+
+
 class Move(StrEnum):
     """What the Desk is doing in this message. Three answers and no fourth."""
 
@@ -108,7 +117,7 @@ class Shape:
         lines = (Line(product=product, quantity=self.quantity, unit_price=unit_price),) + (
             self.companions
         )
-        goods = _total(line.revenue for line in lines)
+        goods = total(line.revenue for line in lines)
         return Offer.of(*lines, charges=sheet.charges(self.terms, goods=goods))
 
 
@@ -229,51 +238,70 @@ def _shapes(position: Position) -> tuple[Shape, ...]:
     """
     ask = position.ask
     shapes = [Shape(lever=None, quantity=ask.quantity, companions=(), terms=Terms())]
-
     for lever in CONSIDERED:
-        if lever is Lever.BUNDLE:
-            companion = _companion(position)
-            if companion is not None:
-                shapes.append(
-                    Shape(
-                        lever=lever,
-                        quantity=ask.quantity,
-                        companions=(
-                            Line(product=companion, quantity=1, unit_price=companion.list_price),
-                        ),
-                        terms=Terms(),
-                    )
-                )
-        elif lever is Lever.QUANTITY_BREAK:
-            if ask.largest_quantity is not None and ask.largest_quantity > ask.quantity:
-                shapes.append(
-                    Shape(
-                        lever=lever,
-                        quantity=ask.largest_quantity,
-                        companions=(),
-                        terms=Terms(),
-                    )
-                )
-        elif lever is Lever.DELIVERY_SPEED:
-            if ask.wants_it_faster:
-                shapes.append(
-                    Shape(
-                        lever=lever,
-                        quantity=ask.quantity,
-                        companions=(),
-                        terms=Terms(delivery=Delivery.EXPRESS),
-                    )
-                )
-        elif ask.can_prepay:
-            shapes.append(
-                Shape(
-                    lever=lever,
-                    quantity=ask.quantity,
-                    companions=(),
-                    terms=Terms(payment=Payment.PREPAID),
-                )
-            )
+        shape = _shape(lever, position)
+        if shape is not None:
+            shapes.append(shape)
     return tuple(shapes)
+
+
+def _shape(lever: Lever, position: Position) -> Shape | None:
+    """The arrangement this lever makes, or ``None`` where the position does not allow it.
+
+    One lever per shape and never two at once. That is a decision rather than a
+    limitation: ticket 21 learns over this action space, and the spec fixes it at four
+    (issue #6, "Levers are a closed set ... so that the later policy work has a fixed
+    action space to choose over"). Allowing combinations would make it sixteen, and would
+    make everything learned before the change incomparable with everything after.
+
+    The final ``raise`` is the point of writing this as a dispatch rather than an
+    if-cascade. ``lever.py`` says adding a member is a deliberate act; the previous shape
+    of this code let a new member fall silently into the last branch and become a
+    payment-terms shape, which is the opposite of deliberate.
+    """
+    ask = position.ask
+    match lever:
+        case Lever.BUNDLE:
+            companion = _companion(position)
+            if companion is None:
+                return None
+            return Shape(
+                lever=lever,
+                quantity=ask.quantity,
+                companions=(
+                    Line(product=companion, quantity=1, unit_price=companion.list_price),
+                ),
+                terms=Terms(),
+            )
+        case Lever.QUANTITY_BREAK:
+            if ask.largest_quantity is None or ask.largest_quantity <= ask.quantity:
+                return None
+            return Shape(
+                lever=lever, quantity=ask.largest_quantity, companions=(), terms=Terms()
+            )
+        case Lever.DELIVERY_SPEED:
+            if not ask.wants_it_faster:
+                return None
+            return Shape(
+                lever=lever,
+                quantity=ask.quantity,
+                companions=(),
+                terms=Terms(delivery=Delivery.EXPRESS),
+            )
+        case Lever.PAYMENT_TERMS:
+            if not ask.can_prepay:
+                return None
+            return Shape(
+                lever=lever,
+                quantity=ask.quantity,
+                companions=(),
+                terms=Terms(payment=Payment.PREPAID),
+            )
+    raise UnknownLever(
+        f"{lever} is in CONSIDERED and this policy does not know what arrangement it "
+        f"makes; adding a lever means adding the shape it produces here, and the bandit "
+        f"of ticket 21 an arm for it"
+    )
 
 
 def _companion(position: Position) -> Product | None:
@@ -441,12 +469,3 @@ def _proposal(
         unit_price=price,
         asked_margin=asked_margin,
     )
-
-
-def _total(amounts: Iterable[Money]) -> Money:
-    """Add up money that is already known to be one currency."""
-    running: Money | None = None
-    for amount in amounts:
-        running = amount if running is None else running + amount
-    assert running is not None, "an offer has at least one line"
-    return running

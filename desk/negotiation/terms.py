@@ -40,11 +40,6 @@ from enum import StrEnum
 from desk.catalogue import Charge
 from desk.spend import CurrencyMismatch, Money
 
-#: The coarsest scale a computed charge may be rounded to: whole units of the currency.
-#: The same clamp ``Product.discounted`` uses, and for the same reason -- a goods total
-#: recorded coarsely must not drag a percentage of it out to the nearest thousand.
-_SMALLEST_SCALE = 0
-
 #: What the handling charge is called on an offer and in a closed mandate.
 HANDLING = "handling"
 
@@ -159,13 +154,16 @@ class TermsSheet:
         """What waiting for this money costs, rounded the way a price is rounded.
 
         Half up, toward the Desk recognising the cost, for the same reason a discount
-        rounds toward the Desk: a rounding rule should never quietly hand out the
-        benefit of a doubt on the Desk's behalf.
+        rounds toward the Desk: a rounding rule should never quietly hand out the benefit
+        of a doubt on the Desk's behalf.
+
+        The grid it lands on is ``Money.scale``'s, which is the grid a discounted price
+        lands on too. Two computations about one deal that rounded differently would
+        disagree by a paisa, and would do it invisibly.
         """
-        exponent = goods.amount.as_tuple().exponent
-        assert isinstance(exponent, int), "a finite Decimal has an integer exponent"
-        scale = Decimal(1).scaleb(min(exponent, _SMALLEST_SCALE))
-        amount = (self.carry[payment] * goods.amount).quantize(scale, rounding=ROUND_HALF_UP)
+        amount = (self.carry[payment] * goods.amount).quantize(
+            goods.scale(), rounding=ROUND_HALF_UP
+        )
         return Money(amount=amount, currency=self.currency)
 
     def _nil(self) -> Money:

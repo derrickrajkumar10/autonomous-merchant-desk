@@ -30,6 +30,10 @@ from decimal import Decimal, InvalidOperation
 #: ISO 4217 alpha-3, which is what AP2's money-carrying constraints name.
 CURRENCY_CODE = re.compile(r"^[A-Z]{3}\Z")
 
+#: The coarsest quantum a computation about money may land on: whole units of the
+#: currency. See ``Money.scale``.
+SMALLEST_SCALE = 0
+
 
 class CurrencyMismatch(ValueError):
     """Two amounts in different currencies, asked to behave like one.
@@ -122,6 +126,29 @@ class Money:
 
     def __ge__(self, other: Money) -> bool:
         return not self < other
+
+    def scale(self) -> Decimal:
+        """The quantum a computation about this amount should land on.
+
+        How finely the amount is written, or whole units, whichever is finer. An amount
+        recorded as ``899.00`` computes to the paisa; one recorded as ``899`` computes to
+        the rupee. Reading it off the amount itself saves this module carrying a table of
+        how many minor units each currency has.
+
+        The clamp at whole units is the part that is not obvious. ``Decimal`` also keeps
+        scales *coarser* than one unit -- ``Decimal("1E+3")`` is one thousand recorded to
+        the nearest thousand -- and quantizing against that would round every result under
+        1,500 to either nothing or the full amount. A computed price silently becoming no
+        price is the worst thing this could do, so the scale is clamped and never read
+        straight off the exponent.
+
+        One copy, because two computations about the same money have to land on the same
+        grid. A discounted price and the cost of waiting to be paid for it that disagreed
+        by a paisa would disagree invisibly, until a deal closed a paisa under its floor.
+        """
+        exponent = self.amount.as_tuple().exponent
+        assert isinstance(exponent, int), "a finite Decimal has an integer exponent"
+        return Decimal(1).scaleb(min(exponent, SMALLEST_SCALE))
 
     def __str__(self) -> str:
         return f"{self.amount} {self.currency}"

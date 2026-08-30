@@ -52,6 +52,7 @@ from desk.catalogue.margin import (
     Margin,
     Offer,
     margin_on,
+    total,
 )
 from desk.catalogue.product import SKU, Product
 from desk.catalogue.schema import TABLE, install_schema
@@ -73,4 +74,5 @@ __all__ = [
     "UnknownProduct",
     "install_schema",
     "margin_on",
+    "total",
 ]
