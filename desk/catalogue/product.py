@@ -171,12 +171,18 @@ class Product:
             )
         asked = self.list_price.amount * (Decimal(1) - share)
         return Money(
-            amount=asked.quantize(self._price_scale(), rounding=ROUND_HALF_UP),
+            amount=asked.quantize(self.price_scale(), rounding=ROUND_HALF_UP),
             currency=self.currency,
         )
 
-    def _price_scale(self) -> Decimal:
-        """The exponent a discounted price is rounded to: the list price's, or finer."""
+    def price_scale(self) -> Decimal:
+        """How finely this product is priced: the list price's scale, or whole units.
+
+        Public because ``discounted`` is not the only thing that has to land a computed
+        price on a real amount. A negotiation works out the least it can charge and has
+        to round that the same way, or the two would disagree by a paisa and the
+        disagreement would be invisible until a deal closed a paisa under its floor.
+        """
         exponent = self.list_price.amount.as_tuple().exponent
         assert isinstance(exponent, int), "a finite Decimal has an integer exponent"
         return Decimal(1).scaleb(min(exponent, _SMALLEST_SCALE))
