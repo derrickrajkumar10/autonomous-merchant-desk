@@ -334,10 +334,14 @@ The tests are the other way in. `tests/catalogue/test_bundle.py` is the shortest
 statement of what this ticket is for: the same discount, refused alone and granted in a
 bundle, in one test.
 
-**Counts, actually run:** 46 tests in `tests/catalogue/`, and 5 added to
+**Counts, actually run:** 58 tests in `tests/catalogue/`, and 5 added to
 `tests/spend/test_money.py` for the one thing `Money` was missing — a unit price times
-a quantity. 307 in the suite as a whole, plus one skipped (the AP2 conformance test,
+a quantity. 401 in the suite as a whole, plus one skipped (the AP2 conformance test,
 which needs the throwaway environment `pyproject.toml` describes).
+
+Eight of those 58 arrived after this ticket: `test_charge.py`, added by ticket 08 along
+with §6 above, because two of its four levers are arithmetic only if a deal can carry
+something that is not a product.
 
 One existing test also changed, and it is worth a sentence because it is the good kind
 of failure. `tests/spine/test_no_model_call.py` refuses to let a new package appear

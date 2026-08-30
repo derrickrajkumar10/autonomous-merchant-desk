@@ -17,6 +17,7 @@ docstrings, which is the one copy that cannot drift from the code it describes.
 | 05 | [Replay and freshness](ticket-05-replay-and-freshness.md) | A genuine message sent twice is still a robbery, so the Desk remembers what it has honoured and insists it was asked just now. |
 | 06 | [The order of the questions](ticket-06-spine-ordering.md) | Cheap certain questions before expensive uncertain ones, and the first refusal ends the conversation. |
 | 07 | [Knowing what a deal is worth](ticket-07-catalogue-and-margin.md) | Every product knows what it cost, so the same discount gets a different answer on coffee and on a laptop. |
+| 08 | [Saying something other than yes or no](ticket-08-negotiation.md) | The Desk bargains: four levers that trade rather than concede, and a walk-away that counts as a success. |
 
 ## Writing one
 
