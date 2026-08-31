@@ -52,7 +52,12 @@ SPINE = ("audit", "identity", "mandate", "spend", "freshness", "spine")
 #:   at which point that stops being true of one object inside it -- which is exactly why
 #:   the choice sits behind a substitutable one, and why this package is not on the list
 #:   above.
-NOT_THE_SPINE = ("catalogue", "negotiation")
+#: - ``settlement`` -- the charge, the receipt and the receipt store (ticket 09). Also
+#:   after the spine, and the furthest thing from it: it calls a *third party* over the
+#:   network, which is the one dependency no check may have. A spine module importing it
+#:   would put a payment rail's availability in the path of deciding whether a mandate
+#:   is valid, so the test below is what keeps that from happening quietly.
+NOT_THE_SPINE = ("catalogue", "negotiation", "settlement")
 
 #: Found through the installed package rather than through the working directory, so
 #: that this reads the ``desk`` the tests actually import.
