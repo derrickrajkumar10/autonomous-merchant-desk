@@ -41,7 +41,14 @@ from typing import Any
 from psycopg import Connection
 from psycopg_pool import ConnectionPool
 
-from desk.mandate import Budget, MandateDigest, MandateOutcome, OpenPaymentMandate
+# From the submodules rather than from ``desk.mandate`` itself. ``desk.mandate.closed``
+# reaches back here for ``Money``, which runs this package's ``__init__`` while
+# ``desk.mandate``'s is still part-way through its own -- so a name taken off the
+# package would be one that does not exist yet, and importing ``desk.mandate`` first in
+# a fresh interpreter would raise. Naming the modules costs a line and closes it.
+from desk.mandate.check import MandateOutcome
+from desk.mandate.payment import Budget, OpenPaymentMandate
+from desk.mandate.sdjwt import MandateDigest
 from desk.spend.money import Money
 from desk.spend.schema import TABLE
 

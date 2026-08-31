@@ -54,15 +54,14 @@ from typing import Any, TypeVar
 
 from desk.audit import AuditEntry, AuditTrail, EventType, ReasonCode
 from desk.identity import AgentIdentity
-from desk.mandate import (
-    ALLOWED_MERCHANTS_CONSTRAINT,
-    MandateDigest,
-    MandateOutcome,
-    OpenCheckoutMandate,
-    OpenMandate,
-    OpenPaymentMandate,
-    digest_of,
-)
+
+# From the submodules and not from ``desk.mandate`` itself; see the note on the same
+# imports in ``accumulator.py`` for the cycle that makes the difference.
+from desk.mandate.check import MandateOutcome
+from desk.mandate.checkout import ALLOWED_MERCHANTS_CONSTRAINT, OpenCheckoutMandate
+from desk.mandate.open_mandate import OpenMandate
+from desk.mandate.payment import OpenPaymentMandate
+from desk.mandate.sdjwt import MandateDigest, digest_of
 from desk.spend.accumulator import BudgetAccumulator, MandateSpend
 from desk.spend.money import Money
 
