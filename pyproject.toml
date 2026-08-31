@@ -12,12 +12,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The real payment rail. An extra rather than a dependency because the rail sits behind
+# a boundary (desk/settlement/rail.py): a Desk that settles against a substituted rail
+# -- which is every test but the handful marked `razorpay` -- never imports this.
+rail = [
+    "razorpay>=1.4",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.7",
     "mypy>=1.13",
     # Embedded Postgres, used by the test fixtures when no server is supplied.
     "pgserver>=0.1.4",
+    # A second, unrelated JOSE implementation. One test verifies a receipt with it and
+    # not with ours, because verifying our own signatures with our own verifier shows
+    # only that the two halves agree with each other -- see ticket 09's spec.
+    "jwcrypto>=1.5",
+    "razorpay>=1.4",
 ]
 
 # Google's own AP2 SDK is deliberately NOT a dependency or an extra here. It is a
@@ -32,6 +43,7 @@ dev = [
 #   uv venv .venv-conformance --python 3.11
 #   uv pip install --python .venv-conformance/Scripts/python.exe \
 #       "psycopg[binary,pool]>=3.2" "pyjwt[crypto]>=2.10" "pytest>=8.3" "pgserver>=0.1.4" \
+#       "jwcrypto>=1.5" "razorpay>=1.4" \
 #       "ap2 @ git+https://github.com/google-agentic-commerce/AP2@e1ea56db72a6385bce3e5c1112b3a56ce60acb43"
 #   .venv-conformance/Scripts/python.exe -m pytest
 #
@@ -49,6 +61,9 @@ packages = ["desk", "world"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "razorpay: talks to Razorpay's test-mode API over the network. Skipped unless RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are set.",
+]
 
 [tool.ruff]
 line-length = 100
@@ -67,5 +82,20 @@ files = ["desk", "world", "tests"]
 [[tool.mypy.overrides]]
 # The embedded test server ships no type information.
 module = "pgserver.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# Razorpay's SDK ships no py.typed marker. It is reached through one adapter behind
+# the rail boundary, and everything that crosses back out of it is our own type.
+module = "razorpay.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# jwcrypto is a third party's JOSE implementation, used by one test to verify a receipt
+# without our code. It ships no type information, and typing it would defeat the point:
+# what that test proves is that a stranger's library reads the artefact as it stands.
+module = "jwcrypto.*"
 ignore_missing_imports = true
 follow_imports = "skip"
