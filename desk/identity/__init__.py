@@ -41,13 +41,21 @@ from desk.identity.keys import (
     AGENT_ID_PREFIX,
     AgentPublicKey,
     DeskPublicKey,
+    DeskReceiptPublicKey,
     ES256PublicKey,
     PrincipalPublicKey,
 )
 from desk.identity.principals import Principal, PrincipalConflict, PrincipalDirectory
 from desk.identity.registry import AgentIdentity, AgentRegistry, RegistrationConflict
 from desk.identity.schema import install_schema
-from desk.identity.signing import DESK_ALG, DESK_KEY_ID, DeskKeypair
+from desk.identity.signing import (
+    DESK_ALG,
+    DESK_KEY_ID,
+    DESK_RECEIPT_ALG,
+    DESK_RECEIPT_KEY_ID,
+    DeskKeypair,
+    DeskReceiptKeypair,
+)
 
 __all__ = [
     "AGENT_ID_PREFIX",
@@ -55,12 +63,16 @@ __all__ = [
     "AGENT_REQUEST_TYP",
     "DESK_ALG",
     "DESK_KEY_ID",
+    "DESK_RECEIPT_ALG",
+    "DESK_RECEIPT_KEY_ID",
     "UNIDENTIFIED_AGENT",
     "AgentIdentity",
     "AgentPublicKey",
     "AgentRegistry",
     "DeskKeypair",
     "DeskPublicKey",
+    "DeskReceiptKeypair",
+    "DeskReceiptPublicKey",
     "ES256PublicKey",
     "IdentityCheck",
     "IdentityOutcome",

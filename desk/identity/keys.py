@@ -14,9 +14,12 @@ rather than merely nominal:
 - **Principal keys are ECDSA P-256**, held as the sixty-five bytes of an uncompressed
   SEC1 point. Mandates are signed ``ES256``, because that is the only scheme AP2's own
   SDK can produce or consume -- see ADR-0002's known exception.
-- **The Desk's own key is ECDSA P-256** for the same reason. It signs the closed
-  Checkout Mandate a negotiation ends in, and that is an AP2 artefact a stranger's
-  library has to be able to read.
+- **The Desk's own mandate key is ECDSA P-256** for the same reason. It signs the
+  closed Checkout Mandate a negotiation ends in, and that is an AP2 artefact a
+  stranger's library has to be able to read.
+- **The Desk's receipt key is Ed25519**, because a receipt is not an AP2 artefact and
+  never goes through AP2's SDK. The exception applies to the document, not to the
+  Desk, so the receipt goes back to ADR-0002's default.
 
 The Desk's key and a principal's are the same *scheme* and emphatically not the same
 *role*: one says a human authorised a purchase, the other says the Desk agreed to a
@@ -197,6 +200,61 @@ class AgentPublicKey:
         derivation, that makes the identity real.
         """
         return f"{AGENT_ID_PREFIX}{self.thumbprint()}"
+
+
+@dataclass(frozen=True)
+class DeskReceiptPublicKey:
+    """The Desk's Ed25519 public key. Receipts verify against it, and only receipts.
+
+    A second Desk key, and the second scheme the Desk signs under, because the two
+    artefacts have different readers. A closed Checkout Mandate is an AP2 document, and
+    AP2's own SDK can neither produce nor consume Ed25519 -- so that one is ``ES256``
+    under ``DeskPublicKey``, as ADR-0002's known exception. A receipt is not an AP2
+    document and never travels through AP2's SDK, so it goes back to ADR-0002's default
+    of Ed25519 and the exception does not follow it.
+
+    Kept apart from ``DeskPublicKey`` for the reason the whole module is built on: one
+    key answers *the Desk agreed to this deal* and the other answers *the Desk charged
+    this and here is the proof*. A path that took one for the other would let a
+    signature over agreed terms stand in for a signature over money that moved.
+
+    FR-7.3 asks that a third party verify a receipt given nothing but this, with a
+    library that is not ours -- so it carries ``jwk`` for whatever they reach for.
+    """
+
+    material: bytes
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.material, bytes) or len(self.material) != KEY_BYTES:
+            raise ValueError(f"an Ed25519 public key is {KEY_BYTES} bytes")
+
+    @classmethod
+    def from_base64url(cls, encoded: str) -> Self:
+        return cls(_decode(encoded))
+
+    @classmethod
+    def from_public_key(cls, key: Ed25519PublicKey) -> Self:
+        return cls(key.public_bytes_raw())
+
+    @classmethod
+    def from_jwk(cls, jwk: Any) -> Self:
+        if _member(jwk, "kty") != "OKP" or _member(jwk, "crv") != "Ed25519":
+            raise ValueError("not an Ed25519 JWK: a receipt key is kty OKP, crv Ed25519")
+        return cls.from_base64url(_member(jwk, "x"))
+
+    def base64url(self) -> str:
+        return base64url_encode(self.material).decode("ascii")
+
+    def jwk(self) -> dict[str, str]:
+        """The key as an RFC 8037 OKP JWK, which is the form a stranger's library reads."""
+        return {"crv": "Ed25519", "kty": "OKP", "x": self.base64url()}
+
+    def thumbprint(self) -> str:
+        return _thumbprint(self.jwk())
+
+    def verifier(self) -> Ed25519PublicKey:
+        """The key as the signing library wants it."""
+        return Ed25519PublicKey.from_public_bytes(self.material)
 
 
 @dataclass(frozen=True)
