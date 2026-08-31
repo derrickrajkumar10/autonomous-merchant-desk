@@ -6,8 +6,8 @@ and signed a closed Checkout Mandate saying what they were. None of it moved a r
 and none of it produced anything a third party could check.
 
 This package closes both gaps, and the second one is the larger. It is being built up a
-piece at a time; what is here so far is the boundary the payment rail sits behind, and
-one implementation of it.
+piece at a time; what is here so far is the boundary the payment rail sits behind, one
+implementation of it, and the receipt itself.
 """
 
 from desk.settlement.rail import Charge, PaymentRail, RailCharge
@@ -21,17 +21,41 @@ from desk.settlement.razorpay_rail import (
     from_minor_units,
     in_minor_units,
 )
+from desk.settlement.receipt import (
+    AGREED_CLAIM,
+    CHAIN_CLAIM,
+    CHARGED_CLAIM,
+    ISSUER,
+    RAIL_CLAIM,
+    RECEIPT_TYP,
+    MandateChain,
+    Receipt,
+    ReceiptNotVerified,
+    issue_receipt,
+    read_receipt,
+)
 
 __all__ = [
+    "AGREED_CLAIM",
+    "CHAIN_CLAIM",
+    "CHARGED_CLAIM",
+    "ISSUER",
     "KEY_ID_VAR",
     "KEY_SECRET_VAR",
     "MINOR_UNITS",
     "RAIL",
+    "RAIL_CLAIM",
+    "RECEIPT_TYP",
     "Charge",
+    "MandateChain",
     "PaymentRail",
     "RailCharge",
     "RailNotConfigured",
     "RazorpayRail",
+    "Receipt",
+    "ReceiptNotVerified",
     "from_minor_units",
     "in_minor_units",
+    "issue_receipt",
+    "read_receipt",
 ]
