@@ -463,10 +463,11 @@ metrics read, so a test reading it exercises the thing those two will.
 the interface a learned policy will have to honour too.
 
 **Counts, actually run:** 66 tests in `tests/negotiation/`, 60 in `tests/mandate/`
-(13 of them the closed mandate's), 58 in `tests/catalogue/` (8 of them charges) and 43 in
-`tests/identity/` (7 of them the Desk's key). 406 in the suite as a whole, plus one
-skipped — the AP2 conformance test, which needs the throwaway environment
-`pyproject.toml` describes.
+(13 of them the closed mandate's), 58 in `tests/catalogue/` (8 of them charges) and 49 in
+`tests/identity/` (7 of them the Desk's key, and 6 more the key store ticket 09 added).
+457 in the suite as a whole, plus two skipped — the AP2 conformance test, which needs the
+throwaway environment `pyproject.toml` describes, and ticket 09's one Razorpay test,
+which skips unless test-mode credentials are set.
 
 Two existing files changed for good reasons. `tests/spine/test_no_model_call.py` refuses
 to let a new package appear under `desk/` without somebody stating whether it is part of
