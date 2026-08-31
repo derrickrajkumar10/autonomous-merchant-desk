@@ -95,6 +95,14 @@ class EventType(StrEnum):
     LEVER_OFFERED = "lever_offered"
     DEAL_CLOSED = "deal_closed"
     WALKED_AWAY = "walked_away"
+
+    # Settlement (Ticket 09). Three members and not two: an attempt written before the
+    # rail is called is the only thing that shows a charge the Desk never heard back
+    # about, and a pair of members that only ever appear after an answer could not.
+    # ``receipt_issued`` is the third -- the succeeded case, named for its artefact
+    # because the artefact is the point.
+    SETTLEMENT_ATTEMPTED = "settlement_attempted"
+    SETTLEMENT_INCOMPLETE = "settlement_incomplete"
     RECEIPT_ISSUED = "receipt_issued"
 
     PROCUREMENT_TRIGGERED = "procurement_triggered"
