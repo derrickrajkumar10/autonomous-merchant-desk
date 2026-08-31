@@ -1,4 +1,4 @@
-"""The two identity tables.
+"""The three identity tables.
 
 The registry holds what the Desk needs to answer "who is asking": the agent's public
 key, the principal it claims to act for, the identity it was issued and when. The
@@ -6,6 +6,11 @@ principal directory holds what the Desk needs to answer "did a human really auth
 this": the principal's own public key. Neither holds **any private key material** --
 the Desk holds its own key and nobody else's (CONTEXT.md section 7). The column lists
 are the whole guarantee, so they are short on purpose and a test asserts their shape.
+
+The third table is the Desk's own, and it is the one exception: it holds the private
+halves of the Desk's two signing keys, so that a receipt stays verifiable after the
+process that signed it is gone. It holds no counterparty's key and confers no spend
+authority. ``vault.py`` sets out what is stored and what that costs.
 
 The two key columns have different widths because the two roles have different
 signature schemes, and the CHECK constraints say so: an agent key is thirty-two raw
@@ -24,9 +29,11 @@ from psycopg import Connection
 
 from desk.identity.jws import AGENT_REQUEST_ALG
 from desk.identity.keys import AGENT_ID_PREFIX
+from desk.identity.signing import DESK_ALG, DESK_RECEIPT_ALG
 
 TABLE = "agent_identity"
 PRINCIPAL_TABLE = "principal_key"
+DESK_KEY_TABLE = "desk_key"
 
 #: ES256, spelled out here rather than imported: ``principals.py`` imports this module,
 #: so importing it back would close a cycle.
@@ -41,6 +48,7 @@ def install_schema(conn: Connection[Any]) -> None:
     """Create the identity tables if they are not there. Idempotent."""
     conn.execute(_TABLE_DDL)
     conn.execute(_PRINCIPAL_TABLE_DDL)
+    conn.execute(_DESK_KEY_TABLE_DDL)
 
 
 _TABLE_DDL = f"""
@@ -73,5 +81,27 @@ CREATE TABLE IF NOT EXISTS {PRINCIPAL_TABLE} (
         CHECK (public_key ~ '^[A-Za-z0-9_-]{{{_PRINCIPAL_KEY_CHARS}}}$'),
     CONSTRAINT principal_key_algorithm_is_supported
         CHECK (key_algorithm = '{PRINCIPAL_KEY_ALG}')
+)
+"""
+
+#: Base64url of thirty-two raw Ed25519 bytes is forty-three characters. The mandate
+#: key's public half is the eighty-seven of an uncompressed P-256 point, so the widths
+#: differ by purpose and the constraint below admits either rather than pinning one.
+_DESK_KEY_TABLE_DDL = f"""
+CREATE TABLE IF NOT EXISTS {DESK_KEY_TABLE} (
+    purpose       text PRIMARY KEY,
+    key_algorithm text NOT NULL,
+    private_key   text NOT NULL,
+    public_key    text NOT NULL UNIQUE,
+    created_at    timestamptz NOT NULL,
+    CONSTRAINT desk_key_purpose_is_named
+        CHECK (purpose ~ '^[a-z_]+$'),
+    CONSTRAINT desk_key_algorithm_is_supported
+        CHECK (key_algorithm IN ('{DESK_ALG}', '{DESK_RECEIPT_ALG}')),
+    CONSTRAINT desk_key_private_half_is_base64url
+        CHECK (private_key ~ '^[A-Za-z0-9_-]{{32,}}$'),
+    CONSTRAINT desk_key_public_half_is_base64url
+        CHECK (public_key ~ '^[A-Za-z0-9_-]{{{_AGENT_KEY_CHARS}}}$'
+            OR public_key ~ '^[A-Za-z0-9_-]{{{_PRINCIPAL_KEY_CHARS}}}$')
 )
 """

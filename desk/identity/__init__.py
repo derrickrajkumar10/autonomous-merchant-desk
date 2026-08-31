@@ -56,6 +56,13 @@ from desk.identity.signing import (
     DeskKeypair,
     DeskReceiptKeypair,
 )
+from desk.identity.vault import (
+    MANDATE_PURPOSE,
+    RECEIPT_PURPOSE,
+    DeskKeyVault,
+    KeyPurposeConflict,
+    PublishedKeys,
+)
 
 __all__ = [
     "AGENT_ID_PREFIX",
@@ -65,10 +72,13 @@ __all__ = [
     "DESK_KEY_ID",
     "DESK_RECEIPT_ALG",
     "DESK_RECEIPT_KEY_ID",
+    "MANDATE_PURPOSE",
+    "RECEIPT_PURPOSE",
     "UNIDENTIFIED_AGENT",
     "AgentIdentity",
     "AgentPublicKey",
     "AgentRegistry",
+    "DeskKeyVault",
     "DeskKeypair",
     "DeskPublicKey",
     "DeskReceiptKeypair",
@@ -76,10 +86,12 @@ __all__ = [
     "ES256PublicKey",
     "IdentityCheck",
     "IdentityOutcome",
+    "KeyPurposeConflict",
     "Principal",
     "PrincipalConflict",
     "PrincipalDirectory",
     "PrincipalPublicKey",
+    "PublishedKeys",
     "RegistrationConflict",
     "RequestHeader",
     "RequestNotVerified",

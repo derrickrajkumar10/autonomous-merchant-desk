@@ -56,6 +56,9 @@ is making about itself, which the Desk is the only party entitled to make and is
 anyway. A stolen Desk key forges the Desk's commitments — an ordinary server-key problem, not
 the delegation hole the wallet closes.
 
-The key is generated per process for now. A receipt "verifiable by a third party given the
-Desk's public key" (FR-7.3) needs one that outlives a restart, and persisting it is ticket 09's
-along with the receipts that need it.
+The key is stored and loaded once, in `desk/identity/vault.py`, so that a closed mandate signed
+today still verifies after a restart. Ticket 09 did that along with the receipts that needed it,
+and added a second Desk key beside this one: receipts are Ed25519, because a receipt is not an
+AP2 document and the exception this ADR turns on does not follow it there. The private halves
+sit unencrypted in the same database as everything else, which is a real limitation and is
+named as one in that module rather than dressed up.

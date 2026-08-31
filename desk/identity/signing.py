@@ -26,12 +26,17 @@ SDK -- so ADR-0002's exception does not reach it and its default of Ed25519 stan
 They are separate objects rather than one object with two methods, so that handing
 something the receipt key does not also hand it the power to sign a mandate.
 
-Both are generated per process here, which is still the limit ticket 08 named: restart
-the Desk and yesterday's artefacts no longer verify against today's published key. The
-next commit is what stores them.
+``generate`` makes a fresh key, which is right for a test and wrong for a running Desk:
+restart it and yesterday's receipts no longer verify against today's published key,
+and FR-7.3's "verifiable given the Desk's public key" would mean nothing. ``restore``
+and ``secret`` are the pair that lets ``vault.py`` keep one key across restarts. They
+are the only route to the private half, and nothing outside the vault calls them.
 
-    desk_key = DeskKeypair.generate()
-    receipt_key = DeskReceiptKeypair.generate()
+    from desk.identity import DeskKeyVault
+
+    vault = DeskKeyVault(pool)
+    closed = close_checkout(..., signed_by=vault.mandate_key())
+    receipt = issue_receipt(..., signed_by=vault.receipt_key())
 """
 
 from __future__ import annotations
@@ -46,7 +51,14 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     generate_private_key,
 )
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    load_der_private_key,
+)
 from jwt.api_jws import encode as jws_encode
+from jwt.utils import base64url_decode, base64url_encode
 
 from desk.identity.keys import DeskPublicKey, DeskReceiptPublicKey
 
@@ -79,6 +91,30 @@ class DeskKeypair:
     @classmethod
     def generate(cls) -> Self:
         return cls(generate_private_key(SECP256R1()))
+
+    @classmethod
+    def restore(cls, secret: str) -> Self:
+        """The key back from what ``secret`` stored. The vault's half of the pair."""
+        restored = load_der_private_key(base64url_decode(secret), password=None)
+        if not isinstance(restored, EllipticCurvePrivateKey):
+            raise ValueError(
+                f"the Desk's mandate key is an ECDSA P-256 key, and what was stored "
+                f"is a {type(restored).__name__}"
+            )
+        return cls(restored)
+
+    def secret(self) -> str:
+        """The private half, base64url of its unencrypted PKCS#8 DER.
+
+        The vault stores this and nothing else calls it. See ``DeskReceiptKeypair``
+        for why it lives on the class rather than in the vault.
+        """
+        der = self._signing_key.private_bytes(
+            encoding=Encoding.DER,
+            format=PrivateFormat.PKCS8,
+            encryption_algorithm=NoEncryption(),
+        )
+        return base64url_encode(der).decode("ascii")
 
     @property
     def public_key(self) -> DeskPublicKey:
@@ -121,10 +157,24 @@ class DeskReceiptKeypair:
     def generate(cls) -> Self:
         return cls(Ed25519PrivateKey.generate())
 
+    @classmethod
+    def restore(cls, secret: str) -> Self:
+        """The key back from what ``secret`` stored. The vault's half of the pair."""
+        return cls(Ed25519PrivateKey.from_private_bytes(base64url_decode(secret)))
+
     @property
     def public_key(self) -> DeskReceiptPublicKey:
         """The half the Desk publishes, and the only half a receipt's reader needs."""
         return DeskReceiptPublicKey.from_public_key(self._signing_key.public_key())
+
+    def secret(self) -> str:
+        """The private half, base64url of its raw thirty-two bytes.
+
+        The vault stores this and nothing else calls it. It is on the class rather than
+        in the vault so that the vault never handles a key object, only an opaque
+        string it cannot accidentally sign with.
+        """
+        return base64url_encode(self._signing_key.private_bytes_raw()).decode("ascii")
 
     def sign(self, claims: Mapping[str, Any], *, typ: str) -> str:
         """One compact JWS over these claims, signed ``EdDSA`` under the Desk's key.

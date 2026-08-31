@@ -81,6 +81,7 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
             conn.execute("DROP FUNCTION IF EXISTS audit_entry_chain_link")
             conn.execute("DROP TABLE IF EXISTS agent_identity")
             conn.execute("DROP TABLE IF EXISTS principal_key")
+            conn.execute("DROP TABLE IF EXISTS desk_key")
             conn.execute("DROP TABLE IF EXISTS mandate_spend")
             conn.execute("DROP TABLE IF EXISTS seen_nonce")
             conn.execute("DROP TABLE IF EXISTS product")
