@@ -34,6 +34,7 @@ from desk.freshness import install_schema as install_freshness_schema
 from desk.identity import AgentIdentity, AgentRegistry, PrincipalDirectory
 from desk.identity import install_schema as install_identity_schema
 from desk.mandate import MandateCheck
+from desk.settlement import install_schema as install_settlement_schema
 from desk.spend import install_schema as install_spend_schema
 from world.agents.keys import AgentKeypair
 from world.wallet import PrincipalKeypair
@@ -85,11 +86,13 @@ def pool(database_url: str) -> Iterator[ConnectionPool]:
             conn.execute("DROP TABLE IF EXISTS mandate_spend")
             conn.execute("DROP TABLE IF EXISTS seen_nonce")
             conn.execute("DROP TABLE IF EXISTS product")
+            conn.execute("DROP TABLE IF EXISTS receipt")
             install_audit_schema(conn)
             install_identity_schema(conn)
             install_spend_schema(conn)
             install_freshness_schema(conn)
             install_catalogue_schema(conn)
+            install_settlement_schema(conn)
         yield pool
 
 
