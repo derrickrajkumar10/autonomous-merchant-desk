@@ -190,6 +190,32 @@ Standing on a standard is a strength, not a shortcut.
 
 ---
 
+## Repository layout
+
+Everything defensible lives in `desk/`. Everything in `world/` exists only to exercise it — it is the environment, not the product.
+
+| Path | What's in it |
+|:-----|:-------------|
+| `desk/identity/` | Agent registry, principal directory, Ed25519 keypairs, JWS signing — check 1. |
+| `desk/mandate/` | AP2 open and closed mandates, the `cnf` key binding, mandate verification — check 2. |
+| `desk/spend/` | The `payment.budget` ceiling and the accumulator that draws it down — check 3. |
+| `desk/freshness/` | The nonce store and the freshness window on the key-binding hop — check 4. |
+| `desk/spine/` | The check runner: checks 1–5 in order, each refusal short-circuiting with a named reason. |
+| `desk/catalogue/` | Products, cost, and the per-product margin floor. |
+| `desk/negotiation/` | Levers, the deal state machine, the learned lever policy, the one-line rationale on every message. |
+| `desk/settlement/` | Razorpay test-mode rail, signed receipts, bank-line matching and Exceptions. |
+| `desk/audit/` | The hash-chained, append-only entry log and its closed refusal vocabulary. |
+| `world/agents/` | Buyer and supplier counterparty agents. Untrusted by construction. |
+| `world/storefront/` | The product listings and terms a counterparty sees. |
+| `world/wallet/` | The separate process that holds a principal's key and signs a mandate after a human approves the prompt playback. |
+| `docs/adr/` | Architecture decision records — one per irreversible choice. |
+| `docs/explainers/` | One layered explainer per check, written for a reader who wasn't in the room. |
+| `tests/` | Mirrors the package tree. AP2 conformance in both directions runs here. |
+
+`CONTEXT.md` explains why the project is shaped this way; `PRD.md` explains what to build.
+
+---
+
 ## What this is not
 
 Honesty about scope is load-bearing here, so none of this is buried.
