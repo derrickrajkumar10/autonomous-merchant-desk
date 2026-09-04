@@ -98,6 +98,7 @@ def a_request(
     payment_nonce: str | None = None,
     audience: str = DESK,
     raw_amount: str | None = None,
+    enquiry: str | None = None,
     body: Mapping[str, Any] | None = None,
 ) -> str:
     """One signed purchase request, defaulting to a wholly valid one.
@@ -114,6 +115,10 @@ def a_request(
     ``body`` replaces the request body outright, which is how a request that is validly
     signed and still not a purchase request gets built. Nothing else about the request
     changes; check 1 passes it, and what happens next is the spine's reading of it.
+
+    ``enquiry`` is free text on the request. The spine never reads it -- only check 5
+    does -- so it changes nothing about which checks pass; it is here so a check-5 test
+    can drive a request with a message on it through the real front door.
 
     ``raw_amount`` writes the price into the JSON as written, unquoted, which is the only
     way to put an exact decimal *number* on the wire from Python: ``json.dumps`` cannot
@@ -176,6 +181,7 @@ def a_request(
         item_id=item_id,
         amount=amount,
         currency=currency,
+        enquiry=enquiry,
     )
 
 

@@ -18,6 +18,12 @@ dependencies = [
 rail = [
     "razorpay>=1.4",
 ]
+# The real check-5 Inspector. An extra rather than a dependency because the Inspector
+# sits behind a boundary (desk/inspector/inspect.py): every test but the one marked
+# `inspector` runs against a scripted Inspector and never imports this.
+inspector = [
+    "anthropic>=0.40",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.7",
@@ -29,6 +35,7 @@ dev = [
     # only that the two halves agree with each other -- see ticket 09's spec.
     "jwcrypto>=1.5",
     "razorpay>=1.4",
+    "anthropic>=0.40",
 ]
 
 # Google's own AP2 SDK is deliberately NOT a dependency or an extra here. It is a
@@ -63,6 +70,7 @@ testpaths = ["tests"]
 addopts = "-q"
 markers = [
     "razorpay: talks to Razorpay's test-mode API over the network. Skipped unless RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are set.",
+    "inspector: runs the real check-5 Inspector against the Anthropic API and reports a hit rate. Skipped unless ANTHROPIC_API_KEY is set.",
 ]
 
 [tool.ruff]
@@ -89,6 +97,15 @@ follow_imports = "skip"
 # Razorpay's SDK ships no py.typed marker. It is reached through one adapter behind
 # the rail boundary, and everything that crosses back out of it is our own type.
 module = "razorpay.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# The Anthropic SDK is reached through one adapter behind the Inspector boundary
+# (desk/inspector/claude.py), and everything that crosses back out of it is our own
+# type -- a Verdict, or an InspectorUnavailable. The import is lazy, so a Desk without
+# the 'inspector' extra never loads it.
+module = "anthropic.*"
 ignore_missing_imports = true
 follow_imports = "skip"
 

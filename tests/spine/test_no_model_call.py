@@ -18,8 +18,8 @@ be added here too, in a diff a reviewer would notice.
 which modules Python loads. A model call has to import something to make it, and
 nothing new appears.
 
-Check 5 lives outside all of this. When it arrives it will have its own package, its own
-model SDK, and it will not be in ``SPINE``.
+Check 5 lives outside all of this. Ticket 10 gave it its own package (``desk/inspector/``),
+its own model SDK, and a place on ``NOT_THE_SPINE`` -- never in ``SPINE``.
 """
 
 from __future__ import annotations
@@ -57,7 +57,14 @@ SPINE = ("audit", "identity", "mandate", "spend", "freshness", "spine")
 #:   network, which is the one dependency no check may have. A spine module importing it
 #:   would put a payment rail's availability in the path of deciding whether a mandate
 #:   is valid, so the test below is what keeps that from happening quietly.
-NOT_THE_SPINE = ("catalogue", "negotiation", "settlement")
+#: - ``inspector`` -- check 5, the content half (ticket 10). It runs *after* the spine,
+#:   on a request the four checks already passed, and it is the one part of the Desk
+#:   that calls a *model*. That is the whole reason it is its own package and not on the
+#:   list above: a spine module reaching into it would put an LLM in the path of a
+#:   deterministic check, which is the exact thing CONTEXT.md section 5 principle 1
+#:   forbids. Check 5 can only refuse (ADR-0005), so nothing it decides feeds back into
+#:   checks 1 to 4.
+NOT_THE_SPINE = ("catalogue", "negotiation", "settlement", "inspector")
 
 #: Found through the installed package rather than through the working directory, so
 #: that this reads the ``desk`` the tests actually import.

@@ -29,7 +29,7 @@ from jwt.api_jws import encode as jws_encode
 from desk.freshness import KEY_BINDING_TYP
 from desk.identity import AGENT_REQUEST_ALG, AGENT_REQUEST_TYP, AgentPublicKey
 from desk.mandate import sd_hash_of, split_presentation
-from desk.spine import AMOUNT, CHECKOUT, CURRENCY, ITEM_ID, PAYMENT
+from desk.spine import AMOUNT, CHECKOUT, CURRENCY, ENQUIRY, ITEM_ID, PAYMENT
 
 #: Sixteen bytes, which is what RFC 9901's examples salt a disclosure with and is far
 #: past any birthday bound that matters here. The specification sets no length: it
@@ -126,6 +126,7 @@ class AgentKeypair:
         item_id: str,
         amount: str,
         currency: str = "INR",
+        enquiry: str | None = None,
     ) -> str:
         """One signed purchase request: both mandates presented, and what is being asked.
 
@@ -144,6 +145,11 @@ class AgentKeypair:
         ``amount`` is a decimal string for the same reason ``Money.of`` insists on one --
         a price written as a float literal has already stopped being the price it was
         written as before anything here sees it.
+
+        ``enquiry`` is free text the buyer wants the Desk to read -- a product question,
+        a note. It is only added to the body when given, so a request that carries none
+        is byte-for-byte what it was before this parameter existed. The spine does not
+        look at it; check 5 does.
         """
         body = {
             CHECKOUT: checkout,
@@ -152,4 +158,6 @@ class AgentKeypair:
             AMOUNT: amount,
             CURRENCY: currency,
         }
+        if enquiry is not None:
+            body[ENQUIRY] = enquiry
         return self.sign_request(body, agent_id=agent_id)

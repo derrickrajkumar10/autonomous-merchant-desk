@@ -3,7 +3,14 @@
 Check 1 proves that a signed request came from a registered agent and reached the Desk
 unaltered. What it hands back is a JSON object, and this module is the one place that
 says what an object has to contain to be a *purchase request*: the two mandates AP2
-splits an authorisation across, the thing being bought, and the price being offered.
+splits an authorisation across, the thing being bought, the price being offered, and
+optionally some free text the buyer wants read.
+
+That last field, ``enquiry``, is the odd one out: the deterministic spine never looks
+at it. It is untrusted prose, and the only thing that reads it is check 5 -- the
+model-backed Inspector in ``desk.inspector``, which runs *after* checks 1 to 4 have
+passed and can only refuse. Carrying it here rather than on a later message keeps the
+untrusted text on the one artefact check 1 has already proven came through unaltered.
 
 **Reading is deliberately lenient, and that is not the same as permissive.** A field
 that is missing, or is of a shape this module cannot read, becomes the emptiest value
@@ -57,6 +64,18 @@ AMOUNT = "amount"
 #: because the Desk holds no exchange rate and check 3 refuses a mismatch outright.
 CURRENCY = "currency"
 
+#: Free text the buyer sends along with the request -- a product question, a note, a
+#: preamble. The deterministic spine never reads it: it is untrusted prose, and the one
+#: thing that looks at it is check 5 (``desk.inspector``), after checks 1 to 4 have
+#: passed. Absent on most requests, and the emptiest value of its kind when it is.
+ENQUIRY = "enquiry"
+
+#: The most enquiry text the Desk keeps. A real product question and a paragraph of
+#: preamble fit inside this comfortably; past it the request is carrying prose to run up
+#: a model bill or a memory bill rather than to be read, so the tail is dropped here --
+#: before anything holds the whole of it, and before check 5 sends it anywhere.
+MAX_ENQUIRY = 8000
+
 
 @dataclass(frozen=True)
 class PurchaseRequest:
@@ -74,6 +93,9 @@ class PurchaseRequest:
     #: What the body said the price was, exactly as it arrived, so that a refusal for
     #: an unreadable amount can show the reader what it could not read.
     stated_price: Mapping[str, Any]
+    #: The buyer's free text, carried through untouched for check 5 to inspect. Empty
+    #: when the request named none. No check between here and check 5 reads it.
+    enquiry: str = ""
 
 
 def read_purchase_request(body: Mapping[str, Any]) -> PurchaseRequest:
@@ -84,12 +106,25 @@ def read_purchase_request(body: Mapping[str, Any]) -> PurchaseRequest:
         item_id=_text(body.get(ITEM_ID)),
         amount=_money(body.get(AMOUNT), body.get(CURRENCY)),
         stated_price={AMOUNT: _shown(body.get(AMOUNT)), CURRENCY: _shown(body.get(CURRENCY))},
+        enquiry=_enquiry(body.get(ENQUIRY)),
     )
 
 
 def _text(field: Any) -> str:
     """A field, but only if it is a string. Anything else named nothing."""
     return field if isinstance(field, str) else ""
+
+
+def _enquiry(field: Any) -> str:
+    """The buyer's free text, as a string and bounded in length.
+
+    A string or nothing, like ``_text`` -- but capped, unlike ``_text``, because the
+    other fields it serves are a sku or a whole mandate JWT and have their own natural
+    size, while an enquiry is prose a stranger chose the length of. Past ``MAX_ENQUIRY``
+    the tail is dropped rather than the request refused: an over-long note is still a
+    note, and check 5 reads the part of it that a person would have.
+    """
+    return field[:MAX_ENQUIRY] if isinstance(field, str) else ""
 
 
 def _money(amount: Any, currency: Any) -> Money | None:
