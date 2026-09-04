@@ -107,9 +107,27 @@ def authorised(
     identity: AgentIdentity,
     *,
     enquiry: str | None = None,
+    amount: str = "750.00",
+    sku: str = "SKU-COFFEE-1KG",
+    ceiling: str = "2000.00",
 ) -> SpineOutcome:
-    """One request that really cleared checks 1 to 4, carrying ``enquiry`` if given."""
-    outcome = spine.receive(a_request(wallet, agent, identity, enquiry=enquiry))
+    """One request that really cleared checks 1 to 4, through the real front door.
+
+    ``amount``/``sku`` vary so a caller can build a *history* of one agent's requests
+    in the trail -- which is what the behavioural half of check 5 reads back.
+    """
+    outcome = spine.receive(
+        a_request(
+            wallet,
+            agent,
+            identity,
+            enquiry=enquiry,
+            amount=amount,
+            item_id=sku,
+            sku=sku,
+            ceiling=ceiling,
+        )
+    )
     assert outcome.passed, outcome.reason_code
     return outcome
 

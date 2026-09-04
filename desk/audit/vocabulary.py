@@ -90,6 +90,14 @@ class EventType(StrEnum):
     CHECK_4_REPLAY_FRESHNESS_REFUSED = "check_4_replay_freshness_refused"
     CHECK_5_INSPECTION_PASSED = "check_5_inspection_passed"
     CHECK_5_INSPECTION_REFUSED = "check_5_inspection_refused"
+    # Check 5 has two halves (Spec 07). The Inspector reads one message's text
+    # (``inspection``, Ticket 10); the behavioural score reads the agent's own request
+    # history (``behaviour``, Ticket 11). They are separate members and not a payload
+    # flag because the control room subscribes by event type, and "an escalation
+    # pattern was seen" is a different thing on screen from "this message was an
+    # injection".
+    CHECK_5_BEHAVIOUR_PASSED = "check_5_behaviour_passed"
+    CHECK_5_BEHAVIOUR_REFUSED = "check_5_behaviour_refused"
 
     NEGOTIATION_MESSAGE_SENT = "negotiation_message_sent"
     LEVER_OFFERED = "lever_offered"

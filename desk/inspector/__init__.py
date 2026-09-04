@@ -21,19 +21,34 @@ Inspector gets, at most, their own message refused.
 - ``claude`` -- the real Inspector. ``claude-opus-5``, no tools, untrusted text under
   a delimiter in a user turn. An optional dependency; every deterministic test uses a
   scripted Inspector instead.
+- ``history`` / ``behaviour`` -- the other half of check 5: an agent's own past
+  requests, read back out of the trail, and an unsupervised score of how far the
+  latest one has drifted from that baseline. No model, no attack labels. A deviant
+  sequence is refused under ``escalation_pattern_detected``.
 
     from desk.inspector import ContentInspection, ScrutinyTier
 
     check5 = ContentInspection(inspector, trail)
-    verdict = check5.inspect(spine_outcome, scrutiny=ScrutinyTier.CLOSE)
-    if not verdict.passed:
-        ...            # verdict.reason_code is prompt_injection_detected
+    content = check5.inspect(spine_outcome, scrutiny=ScrutinyTier.CLOSE)
+    behaviour = BehaviourCheck(trail).assess(spine_outcome, scrutiny=ScrutinyTier.CLOSE)
+    if not content.passed or not behaviour.passed:
+        ...            # prompt_injection_detected / escalation_pattern_detected
 
-The behavioural half of check 5 -- deviation from an agent's own request history -- is
-the next ticket. This one reads one message and emits one refusal.
+Both halves emit a refusal and an audit entry and move no trust score of their own;
+turning their signals into reputation changes is a later ticket.
 """
 
+from desk.inspector.behaviour import (
+    DEFAULT_BASELINE_MIN,
+    RECENT,
+    BehaviourCheck,
+    BehaviourOutcome,
+    BehaviourPolicy,
+    Signals,
+    score_history,
+)
 from desk.inspector.claude import BEGIN, END, MODEL, SYSTEM_PROMPT, ClaudeInspector
+from desk.inspector.history import DEFAULT_WINDOW, RequestEvent, read_history
 from desk.inspector.inspect import (
     SHOWN_ENQUIRY,
     ContentInspection,
@@ -52,11 +67,17 @@ from desk.inspector.verdict import (
 
 __all__ = [
     "BEGIN",
+    "DEFAULT_BASELINE_MIN",
+    "DEFAULT_WINDOW",
     "END",
     "MAX_REASON",
     "MODEL",
+    "RECENT",
     "SHOWN_ENQUIRY",
     "SYSTEM_PROMPT",
+    "BehaviourCheck",
+    "BehaviourOutcome",
+    "BehaviourPolicy",
     "ClaudeInspector",
     "ContentInspection",
     "Finding",
@@ -64,7 +85,11 @@ __all__ = [
     "Inspector",
     "InspectorUnavailable",
     "MalformedVerdict",
+    "RequestEvent",
     "ScrutinyTier",
+    "Signals",
     "Verdict",
     "read_verdict",
+    "read_history",
+    "score_history",
 ]

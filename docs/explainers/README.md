@@ -20,6 +20,7 @@ docstrings, which is the one copy that cannot drift from the code it describes.
 | 08 | [Saying something other than yes or no](ticket-08-negotiation.md) | The Desk bargains: four levers that trade rather than concede, and a walk-away that counts as a success. |
 | 09 | [Taking the money, and proving you were allowed to](ticket-09-settlement-and-receipts.md) | The charge is real, and the receipt is checkable by a stranger holding nothing but a public key. |
 | 10 | [Reading a message for what it is trying to do](ticket-10-the-inspector.md) | A model reads the buyer's text for instructions aimed at the Desk — and even a fully fooled reader can only refuse, never grant. |
+| 11 | [Noticing when an agent stops acting like itself](ticket-11-behavioural-score.md) | Each agent is scored against its own history, not a list of known attacks, so escalation and trust farming show up as a change of character. |
 
 ## Writing one
 

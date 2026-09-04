@@ -121,5 +121,16 @@ def test_query_can_be_limited(populated: AuditTrail) -> None:
     assert [entry.seq for entry in populated.query(limit=2)] == [1, 2]
 
 
+def test_query_most_recent_takes_the_tail_still_oldest_first(populated: AuditTrail) -> None:
+    """How a check reads "lately" for a subject with a long history, without scanning it."""
+    assert [entry.seq for entry in populated.query(most_recent=2)] == [3, 4]
+    assert [entry.seq for entry in populated.query(subject_id="agent-b", most_recent=1)] == [3]
+
+
+def test_query_rejects_limit_and_most_recent_together(populated: AuditTrail) -> None:
+    with pytest.raises(ValueError, match="not both"):
+        populated.query(limit=1, most_recent=1)
+
+
 def test_query_over_an_empty_trail(trail: AuditTrail) -> None:
     assert trail.query() == []

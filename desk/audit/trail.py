@@ -181,13 +181,22 @@ class AuditTrail:
         until: datetime | None = None,
         after_seq: int | None = None,
         limit: int | None = None,
+        most_recent: int | None = None,
     ) -> list[AuditEntry]:
         """Entries matching every filter given, in sequence order.
 
         ``since`` is inclusive and ``until`` exclusive, so adjacent windows tile
         without double-counting. ``after_seq`` is exclusive, which is how the control
         room tails the trail without re-reading what it has already drawn.
+
+        ``limit`` takes the *first* matching entries; ``most_recent`` takes the *last*
+        that many, still returned oldest-first. Pass ``most_recent`` when the question
+        is "what has this subject done lately" over a subject with a long history --
+        the database does the trimming, rather than every row being read to keep a
+        handful. The two are not combined.
         """
+        if limit is not None and most_recent is not None:
+            raise ValueError("query takes limit or most_recent, not both")
         conditions: list[sql.Composable] = []
         params: list[Any] = []
 
@@ -215,14 +224,21 @@ class AuditTrail:
         )
         if conditions:
             statement = statement + sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
-        statement = statement + sql.SQL(" ORDER BY seq")
-        if limit is not None:
-            statement = statement + sql.SQL(" LIMIT %s")
-            params.append(limit)
+        if most_recent is not None:
+            statement = statement + sql.SQL(" ORDER BY seq DESC LIMIT %s")
+            params.append(most_recent)
+        else:
+            statement = statement + sql.SQL(" ORDER BY seq")
+            if limit is not None:
+                statement = statement + sql.SQL(" LIMIT %s")
+                params.append(limit)
 
         with self._pool.connection() as conn:
             rows = conn.execute(statement, params).fetchall()
-        return [_to_entry(row) for row in rows]
+        entries = [_to_entry(row) for row in rows]
+        if most_recent is not None:
+            entries.reverse()
+        return entries
 
     def head(self) -> AuditEntry | None:
         """The last entry written, or ``None`` on an empty trail."""
