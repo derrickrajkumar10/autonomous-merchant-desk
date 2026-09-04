@@ -64,7 +64,14 @@ SPINE = ("audit", "identity", "mandate", "spend", "freshness", "spine")
 #:   deterministic check, which is the exact thing CONTEXT.md section 5 principle 1
 #:   forbids. Check 5 can only refuse (ADR-0005), so nothing it decides feeds back into
 #:   checks 1 to 4.
-NOT_THE_SPINE = ("catalogue", "negotiation", "settlement", "inspector")
+#: - ``reputation`` -- the trust score, the rung ladder and the standing gate (ticket
+#:   12). It runs *after* the spine, and its gate is a refusal only. It reads a rung
+#:   ceiling and a scrutiny tier off Desk-side state rather than off a mandate, which is
+#:   exactly the kind of out-of-band judgement a deterministic check must not depend on:
+#:   a spine module importing it would make check 3's answer a function of the agent's
+#:   history. Reputation gates how much an agent may do, never whether the checks run
+#:   (CONTEXT.md section 10).
+NOT_THE_SPINE = ("catalogue", "negotiation", "settlement", "inspector", "reputation")
 
 #: Found through the installed package rather than through the working directory, so
 #: that this reads the ``desk`` the tests actually import.

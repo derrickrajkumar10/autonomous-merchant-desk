@@ -123,8 +123,18 @@ class EventType(StrEnum):
     MATCH_FOUND = "match_found"
     EXCEPTION_RECORDED = "exception_recorded"
 
+    # Reputation ladder (Ticket 12). A score change and a rung change are separate
+    # members, not one with a flag, because the control room subscribes by event type
+    # and "this agent moved up a rung" is a different thing on screen from "its score
+    # ticked". The standing gate -- reputation's one refusal, run after the spine --
+    # passes or refuses under its own pair, so refusals still break down by the step
+    # that made them (CONTEXT.md section 9). ``agent_blocked`` marks the moment an
+    # agent crosses the bad-behaviour threshold; its reason code has the same string.
     TRUST_SCORE_CHANGED = "trust_score_changed"
     RUNG_CHANGED = "rung_changed"
+    STANDING_GATE_PASSED = "standing_gate_passed"
+    STANDING_GATE_REFUSED = "standing_gate_refused"
+    AGENT_BLOCKED = "agent_blocked"
 
 
 def coerce_reason_code(value: ReasonCode | str) -> ReasonCode:

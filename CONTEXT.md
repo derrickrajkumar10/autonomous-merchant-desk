@@ -141,6 +141,10 @@ of them (*error*, *failure*, *reconciliation*) actively misrepresent what the sy
 | **Trust score** | Per-agent reputation that gates spend ceiling and scrutiny tier. | Rating, karma |
 | **Spend ceiling** | The maximum a given agent may transact for, set by its rung on the ladder. Rungs have a minimum dwell time; that dwell time is the anti-farming mechanism. | Limit, quota |
 | **Scrutiny tier** | One of three discrete levels controlling how aggressively check 5 runs against an agent. | Strictness, mode |
+| **Rung** | One discrete step on the reputation ladder. Carries a spend ceiling, a scrutiny tier, the score that makes it available, and a dwell time. An agent is on exactly one. | Level, tier, band |
+| **Dwell time** | The least elapsed time an agent must spend on a rung before it may climb to the next, however high its score. Volume cannot pay it; this is what makes trust farming uneconomic. | Cooldown, delay |
+| **Standing gate** | The step after the trust spine that refuses a request over the agent's rung ceiling (`ceiling_exceeded_for_tier`), or a blocked agent (`agent_blocked`). Reputation's only refusal. | Reputation check, check 6 |
+| **Trust farming** | Building a clean record with small deals, then attempting one disproportionate deal at the moment the ceiling is highest. The dwell time exists to defeat it. | — |
 | **Inspector** | The check-5 LLM pass. A classifier with no tools that may only refuse or lower trust, never grant. | Guard, filter, moderator |
 | **Wallet** | The separate process holding the principal's key and signing mandates after a human approves the prompt playback. Never in the buyer agent's process. | Keystore, signer |
 | **Margin floor** | Minimum acceptable margin on a deal. Not a price floor. | **Price floor**, minimum price |

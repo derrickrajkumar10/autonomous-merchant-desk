@@ -21,6 +21,7 @@ docstrings, which is the one copy that cannot drift from the code it describes.
 | 09 | [Taking the money, and proving you were allowed to](ticket-09-settlement-and-receipts.md) | The charge is real, and the receipt is checkable by a stranger holding nothing but a public key. |
 | 10 | [Reading a message for what it is trying to do](ticket-10-the-inspector.md) | A model reads the buyer's text for instructions aimed at the Desk — and even a fully fooled reader can only refuse, never grant. |
 | 11 | [Noticing when an agent stops acting like itself](ticket-11-behavioural-score.md) | Each agent is scored against its own history, not a list of known attacks, so escalation and trust farming show up as a change of character. |
+| 12 | [What an agent's record buys it](ticket-12-reputation-ladder.md) | A ladder of spending limits an agent climbs one rung at a time, where time on a rung is a cost volume cannot pay — so a clean record cannot be farmed into one big grab. |
 
 ## Writing one
 
