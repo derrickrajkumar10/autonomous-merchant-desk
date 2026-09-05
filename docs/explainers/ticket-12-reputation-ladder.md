@@ -76,11 +76,11 @@ because it has not been on its current rung long enough — and there is nothing
 So the farming attack changes shape. To get a large ceiling, the agent now has to
 genuinely wait — days on rung 0, then days on rung 1, then a week on rung 2 — behaving
 well the entire time, with a real identity the whole run traces back to. That is no
-longer "farming". That is just being a customer for a month. If an attacker is willing
-to do that, patiently, in the open, the Desk has extracted a month of good behaviour
-and a fully attributable identity as the price of one large transaction — and the
-behavioural score from the previous ticket is still watching for the moment the
-character changes.
+longer "farming". That is just being a well-behaved buyer agent for a month. If an
+attacker is willing to do that, patiently, in the open, the Desk has extracted a month
+of good behaviour and a fully attributable identity as the price of one large
+transaction — and the behavioural score from the previous ticket is still watching for
+the moment the character changes.
 
 The dwell time is the part of this design most likely to be dropped as fiddly. Without
 it, the ladder is just a slower version of the dial, and the farming attack works
@@ -106,9 +106,9 @@ workflow for.
 
 And a score that has climbed above baseline **decays** back toward it while the agent
 is inactive. A little each day. This is not a punishment — it is what makes a dormant
-high-trust identity worthless to steal. If an attacker compromises the credentials of
-an agent that earned its way to rung 3 and then went quiet, they inherit an agent
-that is drifting back to ordinary by the day. Decay only ever moves a score *down*: an
+high-trust identity worthless to steal. If an attacker compromises the keypair of an
+agent that earned its way to rung 3 and then went quiet, they inherit an agent that is
+drifting back to ordinary by the day. Decay only ever moves a score *down*: an
 agent sitting at baseline, or a blocked one, is left exactly where it is. Time alone
 never earns trust.
 
@@ -189,7 +189,8 @@ One agent on the ladder (default policy):
 
 ## 7. What this costs, honestly
 
-**A patient attacker is not stopped — they are converted into a customer.** Everything
+**A patient attacker is not stopped — they are converted into a well-behaved buyer
+agent.** Everything
 in section 3 is true, but the flip side is: if someone will genuinely wait a month,
 behaving well, with an attributable identity, they can reach a high rung. This design
 does not claim to stop that. It claims to make it expensive, slow, visible, and
@@ -308,11 +309,11 @@ produced.
 is the guard on section 5, and `tests/spine/test_no_model_call.py` is what keeps a
 spine module from importing this package.
 
-**Counts, actually run:** 19 tests in `tests/reputation/` — 12 on the score and rung
-arithmetic (including one that pins a custom ladder's rung drops to the ladder that
-was injected, not the default one), 6 through the standing gate, 1 the walkthrough.
-523 in the suite as a whole, plus the same three skipped as before — the AP2
-conformance test, ticket 09's Razorpay test, and ticket 10's real-Inspector corpus
+**Counts, actually run:** 20 tests in `tests/reputation/` — 13 on the score and rung
+arithmetic (including two that pin rung climbs and rung drops to the ladder that was
+actually injected, not the default one), 6 through the standing gate, 1 the
+walkthrough. 524 in the suite as a whole, plus the same three skipped as before — the
+AP2 conformance test, ticket 09's Razorpay test, and ticket 10's real-Inspector corpus
 test.
 
 One existing file grew that was not a test: `desk/audit/vocabulary.py` gained three

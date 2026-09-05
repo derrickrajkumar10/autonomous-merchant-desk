@@ -240,7 +240,7 @@ class ReputationLadder:
             state = self._add_signal(conn, state)
             state = self._settle_rung_down(conn, state, at)
             if state.signal_count >= self._policy.block_after_signals and not state.blocked:
-                state = self._block(conn, state, at)
+                state = self._block(conn, state)
         return self._standing(state)
 
     # -- settling --------------------------------------------------------------------
@@ -359,7 +359,12 @@ class ReputationLadder:
     ) -> _State:
         if new_index == state.rung:
             return state
-        before, after = self._ladder[state.rung], self._ladder[new_index]
+        # ``state.rung`` is clamped, not indexed directly, for the same reason
+        # ``rung_at`` itself is: it is a stored index, and a ladder shortened since it
+        # was written must land the read on the new top rung rather than raise.
+        # ``new_index`` needs no such clamp -- every caller already derives it from
+        # ``self._ladder``.
+        before, after = rung_at(state.rung, self._ladder), self._ladder[new_index]
         self._trail.record(
             actor="desk",
             event_type=EventType.RUNG_CHANGED,
@@ -385,7 +390,12 @@ class ReputationLadder:
         )
         return replace(state, rung=new_index, rung_since=now)
 
-    def _block(self, conn: Connection[Any], state: _State, now: datetime) -> _State:
+    def _block(self, conn: Connection[Any], state: _State) -> _State:
+        """Block the agent for good.
+
+        When this happened is the trail entry's own ``ts``; there is no separate
+        ``blocked_at`` column on the row to keep in step with it.
+        """
         self._trail.record(
             actor="desk",
             event_type=EventType.AGENT_BLOCKED,

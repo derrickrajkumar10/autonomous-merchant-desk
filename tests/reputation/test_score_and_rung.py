@@ -248,3 +248,39 @@ def test_an_injected_ladder_is_the_one_rung_drops_are_settled_against(
     settled = ladder.standing(AGENT, now=START)  # no signal, no time passed: nothing should move
     assert settled.rung.index == 1
     assert settled.rung.name == "high"
+
+
+def test_a_rung_drop_clamps_a_stored_index_the_current_ladder_no_longer_reaches(
+    pool: ConnectionPool, trail: AuditTrail
+) -> None:
+    """A stored rung higher than a ladder now in use is clamped, not indexed raw.
+
+    An agent is climbed to rung 3 of a four-rung ladder. A second ``ReputationLadder``
+    over the same row, built with a shortened two-rung ladder -- the "the ladder got
+    shorter between a write and a read" case ``ladder.rung()`` exists for -- then drops
+    the rung. Before this was fixed, the drop indexed the *stored* rung (3) straight
+    into the two-rung ladder to build the ``rung_changed`` entry's ``from`` field and
+    raised ``IndexError`` instead of clamping it to the new top rung.
+    """
+    tall: tuple[Rung, ...] = tuple(
+        Rung(i, f"tall-{i}", Money.of("100.00", "INR"), ScrutinyTier.CLOSE, at, timedelta(0))
+        for i, at in enumerate((0.0, 0.05, 0.10, 0.15))
+    )
+    climbing = ReputationLadder(pool, trail, ladder=tall)
+    for _ in range(3):  # 0.10 -> 0.14 -> 0.18 -> 0.22, climbing one rung each time
+        climbed = climbing.record_clean_deal(AGENT, now=START)
+    assert climbed.rung.index == 3
+
+    short: tuple[Rung, ...] = (
+        Rung(0, "short-0", Money.of("100.00", "INR"), ScrutinyTier.CLOSE, 0.0, timedelta(0)),
+        Rung(1, "short-1", Money.of("999.00", "INR"), ScrutinyTier.LIGHT, 0.50, timedelta(0)),
+    )
+    shrunk = ReputationLadder(pool, trail, ladder=short)
+
+    dropped = shrunk.record_check5_signal(
+        AGENT, reason_code=ReasonCode.ESCALATION_PATTERN_DETECTED, now=START
+    )  # does not raise IndexError
+
+    assert dropped.rung.index == 0
+    entry = trail.query(event_type=EventType.RUNG_CHANGED)[-1]
+    assert entry.payload["evidence"]["from"] == "rung 1 (short-1)"

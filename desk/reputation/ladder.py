@@ -73,15 +73,20 @@ def _rung(
     )
 
 
-#: The ladder, lowest rung first. Written once and read everywhere: the gate reads a
-#: ceiling off it, check 5 reads a scrutiny tier off it, the store walks it to decide
-#: whether a score has earned a climb. Reordering it or changing a number is a visible
-#: edit to a named list rather than a constant buried in a method.
-LADDER: tuple[Rung, ...] = (
-    _rung(0, "newcomer", "2000.00", ScrutinyTier.CLOSE, 0.0, 1),
-    _rung(1, "regular", "15000.00", ScrutinyTier.STANDARD, 0.30, 3),
-    _rung(2, "established", "75000.00", ScrutinyTier.STANDARD, 0.55, 7),
-    _rung(3, "principal", "300000.00", ScrutinyTier.LIGHT, 0.80, 14),
+#: The ladder, lowest rung first, described as plain tuples so nothing here types an
+#: index by hand -- ``index`` is a rung's position in this list, enforced below by
+#: ``enumerate`` rather than by every entry getting it right. Reordering this list or
+#: changing a number is a visible edit to a named list rather than a constant buried in
+#: a method, and there is no separate number to keep in step with the reordering.
+_STEPS: tuple[tuple[str, str, ScrutinyTier, float, int], ...] = (
+    ("newcomer", "2000.00", ScrutinyTier.CLOSE, 0.0, 1),
+    ("regular", "15000.00", ScrutinyTier.STANDARD, 0.30, 3),
+    ("established", "75000.00", ScrutinyTier.STANDARD, 0.55, 7),
+    ("principal", "300000.00", ScrutinyTier.LIGHT, 0.80, 14),
+)
+LADDER: tuple[Rung, ...] = tuple(
+    _rung(index, name, ceiling, scrutiny, at, days)
+    for index, (name, ceiling, scrutiny, at, days) in enumerate(_STEPS)
 )
 
 #: Where every agent starts (FR-4.2): the lowest rung, under the strictest scrutiny.
